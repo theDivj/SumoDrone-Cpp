@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+/.vs/SumoDrone
+/archive
+/x64/Debug
+/SumoDrone/x64/Release/SumoDrone.tlog
+/SumoDrone/x64/Release
+/x64/Release
+CMakeLists.txt
