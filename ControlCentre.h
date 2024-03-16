@@ -56,7 +56,7 @@ public:
 
     void notifyEVState( EV* ev, EVState evState, std::string droneID, double capacity);
 
-    void printDroneStatistics(bool brief, std::string version);
+    void printDroneStatistics(bool brief, std::string runstring);
 
     void requestCharge( EV* ev, double capacity, double requestedWh);
 

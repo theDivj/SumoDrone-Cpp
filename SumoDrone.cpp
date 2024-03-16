@@ -1,9 +1,11 @@
 ﻿// SumoDrone.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 #include "stdlib.h"
+
+#include <libsumo/libsumo.h>
+
 #include "SumoDrone.h"
 #include "argparse.h"
-#include <libsumo/libsumo.h>
 #include "Drone.h"
 #include "GlobalFlags.h"
 
@@ -24,7 +26,7 @@ SumoDrone::SumoDrone() {
 }
 
 SumoDrone::~SumoDrone() {
-    gg->cc->printDroneStatistics(briefStatistics, "3.2");
+    gg->cc->printDroneStatistics(briefStatistics, this->runstring);
 }
 
 GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
@@ -154,9 +156,16 @@ int main(int argc, char* argv[]) {
     Simulation::close();
   */  
     SumoDrone* session = new SumoDrone;
+    string runstring;
+    for (int i = 0; i < argc; i++)
+       runstring += std::string(" ") + std::string(argv[i]);
+
+    session->runstring = runstring;
+
     GlobalFlags* gg = session->parseRunstring(argc, argv);
 
     session->loop();
+
     delete session;
     delete gg;
 

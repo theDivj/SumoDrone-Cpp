@@ -6,6 +6,7 @@
 #include <vector>
 #include <set>
 
+#include "SumoDrone.h"
 #include "ControlCentre.h"
 #include "GlobalFlags.h"
 
@@ -266,7 +267,7 @@ bool droneCmp(const Drone* lurg, const Drone* rurg)
     return stoi(lurg->getID().substr(1)) < stoi(rurg->getID().substr(1));
 }
 
-void ControlCentre::printDroneStatistics(bool brief, string version) {   //Print out Drone and EV statistics for the complete run"""
+void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Print out Drone and EV statistics for the complete run"""
     // compute drone statistic totals
     int tmyFlyingCount = 0;           // used to compute distance travelled
     int tmyFullCharges = 0;           // count of complete charges
@@ -332,10 +333,11 @@ void ControlCentre::printDroneStatistics(bool brief, string version) {   //Print
     ss << std::put_time(gmtime(&itt), "%FT%TZ");
     string timeStamp = ss.str();
 
+    auto libsumoVersion = libsumo::Simulation::getVersion();
+
     // all done, dump the distance travelled by the drones and KW used
     if (brief) {
-        string sumoVersion = "3.2"; // libsumo.GetVersion?
-        string runstring = "dont know";
+        string sumoVersion = "(" +  libsumoVersion.first  + std::string(", ") + libsumoVersion.second + ")";
 
         cout << "Date\tRv\tOnce\tOutput\twE\twU\tradius\tSteps\tDrones"
             << "\tDistance\tFlyKWh\tchKWh\tFlyChgKWh\tChgKWh\trFlyKWh\trChKWh"
@@ -362,9 +364,9 @@ void ControlCentre::printDroneStatistics(bool brief, string version) {   //Print
             << EV::evCount << "\t" << EV::evChargeSteps * Drone::WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
             << tmyFullCharges << "\t" << tmyBrokenCharges << "\t" << tmyBrokenEVCharges << "\t";
         if (GlobalFlags::myModelRendezvous)
-            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
+            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring  << "\t" << sumoVersion << endl;
         else
-            cout << "\t\t\t\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
+            cout << "\t\t\t\t" << runstring << "\t" << sumoVersion << endl;
 
     }
     else {

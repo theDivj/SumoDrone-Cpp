@@ -18,6 +18,8 @@ public:
     bool briefStatistics;   // = false
     int maxEVs;             // = numeric_limits<int>::max();
     std::string sumoCmd;
+    std::string runstring;
+    
     GlobalFlags* gg;
 
     SumoDrone();
