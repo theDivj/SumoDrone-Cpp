@@ -1,8 +1,12 @@
+#include <cstdlib>
+#include <iostream>
 #include <string>
+#include <iomanip>
+
 #include "EV.h"
 #include "Drone.h"
-#include <iostream>
 #include "GlobalFlags.h"
+
 
 using namespace libsumo;
 using namespace std;
@@ -43,8 +47,8 @@ EV::EV(const std::string& evID, double kmPerWh) {
 
     if (GlobalFlags::usingRandom()) {
         double variation = pRandomVariation * myevChargeRequestWh;
-        variation *= (2 * GlobalFlags::getRandom() - 1);
-        myChargeNeededThreshold = chargeNeededThreshold + variation + static_cast<int>(1000 * GlobalFlags::getRandom()) - 500;
+        variation *= ((2. * (rand()/double(RAND_MAX))) - 1.);
+        myChargeNeededThreshold = chargeNeededThreshold + variation + 1000. * rand()/double(RAND_MAX) - 500;
         myevChargeRequestWh += variation;
     }
     myChargeDone = chargeDoneThreshold;
@@ -69,14 +73,14 @@ void EV::stopCharging(double remainingCharge) {      // state change triggered b
     if (myState ==EVState::CHARGINGFROMDRONE) {
         if (remainingCharge > 0) {
             myState =EVState::CHARGEREQUESTED;
-            GlobalFlags::cc->notifyEVState(this,EVState::CHARGEBROKENOFF, myDrone->getID(), myCapacity);
+            GlobalFlags::cc->notifyEVState(this,EVState::CHARGEBROKENOFF, myDrone, myCapacity);
             GlobalFlags::cc->requestCharge(this, myCapacity, remainingCharge);
             myDrone = nullptr;
         }
         else {
             myCapacity = std::stod(Vehicle::getParameter(myID, "device.battery.actualBatteryCapacity"));
             myState =EVState::DRIVING;
-            GlobalFlags::cc->notifyEVState(this, myState, myDrone->getID(), myCapacity);
+            GlobalFlags::cc->notifyEVState(this, myState, myDrone, myCapacity);
             myDrone = nullptr;
         }
     }
@@ -136,7 +140,7 @@ void EV::update() {
                     Vehicle::setColor(myID, TraCIColor(0, 255, 0, 255));
                     myState =EVState::CHARGINGFROMDRONE;
                     myCapacity = std::stod(Vehicle::getParameter(myID, "device.battery.actualBatteryCapacity"));
-                    GlobalFlags::cc->notifyEVState(this, myState, myDrone->getID(), myCapacity);
+                    GlobalFlags::cc->notifyEVState(this, myState, myDrone, myCapacity);
                     myChargeDone = myCapacity + myLastChargeRequest;
                 }
                 else {
@@ -174,12 +178,12 @@ void EV::update() {
     case EVState::LEFTSIMULATION:
         captureStats();
         if (myDrone != nullptr) {
-            GlobalFlags::cc->notifyEVState(this, myState, myDrone->getID(), myCapacity);
+            GlobalFlags::cc->notifyEVState(this, myState, myDrone, myCapacity);
             myDrone->notifyEVFinished(myState);
             myDrone = nullptr;
         }
         else {
-            GlobalFlags::cc->notifyEVState(this, myState, "", myCapacity);
+            GlobalFlags::cc->notifyEVState(this, myState, myDrone, myCapacity);
         }
         myState =EVState::NULLSTATE;
         break;

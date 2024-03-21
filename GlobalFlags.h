@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 #include <fstream>
-#include <random>
+#include <cstdlib>
 #include "ControlCentre.h"
 #include "ChargeHubs.h"
 #include "dSimulation.h"
@@ -27,7 +27,6 @@ public:
     static inline std::ofstream myDroneLog;       // = None         # Filename for the drone log
 
     static inline double myDroneKmPerHr;              // = 60.0     # default drone speed - to allow command line override
-    static inline std::default_random_engine myRandom;
     static inline bool myUseRandom;                   // = False       # whether to generate 'random' charge requests
 
     GlobalFlags(dSimulation* pss, ChargeHubs* pch, ControlCentre* pcc) { ss = pss; ch = pch; cc = pcc; }
@@ -39,8 +38,8 @@ public:
         return myDroneKmPerHr;
     }
 
-    static const unsigned int inline getRandom(void) {    // invoke my generator!
-        return GlobalFlags::myRandom();
+    double getRandom(void) {    // invoke my generator!
+        return rand();
     }
 
     static void setGlobals(double droneKmPerHr, unsigned int randomSeed, std::string droneLog, std::string chargeLog, bool onlyChargeOnce, bool modelRendezvous);

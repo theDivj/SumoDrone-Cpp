@@ -25,7 +25,7 @@ public:
     static inline double wUrgency;
     static inline double proximityRadius;
     static inline int maxDrones;
-    static inline std::string droneType;
+    static inline bool zeroDrone;
 
     static inline std::unordered_map< EV*, double> requests;
     static inline std::unordered_map< EV*, Drone*> allocatedEV;
@@ -36,7 +36,7 @@ public:
     static inline int spawnedDrones;
 
 
-    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones, std::string droneType = "ehang184");
+    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones);
 
     ControlCentre() = default;
 
@@ -54,11 +54,20 @@ public:
 
     void notifyDroneState(Drone* drone);
 
-    void notifyEVState( EV* ev, EVState evState, std::string droneID, double capacity);
+    void notifyEVState( EV* ev, EVState evState, Drone* drone, double capacity);
 
-    void printDroneStatistics(bool brief, std::string runstring);
+    void printDroneStatistics(bool brief, std::string version, std::string runstring);
 
     void requestCharge( EV* ev, double capacity, double requestedWh);
+
+    void setMaxDrones(int pmaxDrones) {
+        maxDrones = pmaxDrones;
+        syncSpawnedDrones();
+    }
+
+    void syncSpawnedDrones() { // if we'd generated drones from POI we need to update our spawnedDrone count
+        spawnedDrones = Drone::getIDCount();
+    }
 
     void update();
 };

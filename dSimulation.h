@@ -25,4 +25,8 @@ public:
     }
 
     static bool dStep();
+
+    void setMaxEvs(int pmaxEvs) {
+        maxEVs = pmaxEvs;
+    }
 };

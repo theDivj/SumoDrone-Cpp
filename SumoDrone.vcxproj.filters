@@ -45,6 +45,9 @@
     <ClCompile Include="ops.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DroneType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChargeHubs.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ops.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DroneType.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

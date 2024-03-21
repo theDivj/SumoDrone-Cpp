@@ -22,12 +22,11 @@ auto uCompare = [](urgency a, urgency b) {
     return (a.u < b.u);
     };*/
 
-ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones, string pdroneType) {
+ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones) {
     wEnergy = pwEnergy;
     wUrgency = pwUrgency;
     proximityRadius = pproximityRadius;
     maxDrones = pmaxDrones;
-    droneType = pdroneType;
     spawnedDrones = 0;
 }
 
@@ -60,7 +59,7 @@ void ControlCentre::allocateDrones() {
     else if (ld < 1 && nd > 0)
         for (const auto& pr : urgencyList) {
             auto hub = GlobalFlags::ch->nearestHubLocation(pr.ev->getMyPosition());
-            Drone* drone = new Drone(hub.first.xypos, droneType);
+            Drone* drone = new Drone(hub.first.xypos);
             spawnedDrones += 1;
             allocate(drone, pr.ev);
             if ((nd -= 1) <= 0)
@@ -91,7 +90,7 @@ void ControlCentre::allocateDrones() {
                 for (const auto& pr : urgencyList) {
                     TraCIPosition evPos = pr.ev->getMyPosition();
                     pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
-                    Drone* drone = new Drone(hub.first.xypos, droneType);
+                    Drone* drone = new Drone(hub.first.xypos);
                     ControlCentre::spawnedDrones += 1;
                     allocate(drone, pr.ev);
                     nd -= 1;
@@ -103,7 +102,7 @@ void ControlCentre::allocateDrones() {
         for (const auto& pr : urgencyList) {
             TraCIPosition evPos = pr.ev->getMyPosition();
             pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
-            Drone* drone = new Drone(hub.first.xypos, droneType);
+            Drone* drone = new Drone(hub.first.xypos);
             ControlCentre::spawnedDrones += 1;
             allocate(drone, pr.ev);
             nd -= 1;
@@ -165,11 +164,9 @@ TraCIPosition ControlCentre::findRendezvousXY( EV* ev, Drone* drone) {
     TraCIPosition posEV =  ev->getMyPosition();
     TraCIPosition posDrone = drone->getMyPosition();
     double distanceToEV = hypot(posDrone.x - posEV.x, posDrone.y - posEV.y);
-    double crowFlies = distanceToEV / Drone::droneMperSec;
+    double crowFlies = distanceToEV / drone->myDt->droneMperSec;
     // how far vehicle can travel in same time
     double evCrowFlies = evSpeed * crowFlies;
-
-    // where on the road that distance is
     std::tuple<std::string, double, bool> edgePos = findEdgePos(evID, evCrowFlies);
     if (get<2>(edgePos)) {
         TraCIPosition posRV = Simulation::convert2D(get<0>(edgePos), get<1>(edgePos)); // get the x, y position after evCrowFlies metres
@@ -177,7 +174,7 @@ TraCIPosition ControlCentre::findRendezvousXY( EV* ev, Drone* drone) {
         pair<double, double> evV = { (posRV.x - posEV.x) / crowFlies, (posRV.y - posEV.y) / crowFlies };
 
         pair <double, double> vectorFromEV = { posDrone.x - posEV.x, posDrone.y - posEV.y };
-        double a = pow(Drone::droneMperSec, 2) - pow(evSpeed, 2);
+        double a = pow(drone->myDt->droneMperSec, 2) - pow(evSpeed, 2);
         double b = 2 * (vectorFromEV.first * evV.first + vectorFromEV.second * evV.second);
         double c = -pow(distanceToEV, 2);
         double bb4ac = (b * b) - (4 * a * c);
@@ -219,13 +216,13 @@ void ControlCentre::notifyDroneState(Drone* drone) {  // Notification from Drone
         needChargeDrones.insert(drone);
 }
 
-void ControlCentre::notifyEVState(EV* ev, EVState evState, string droneID, double capacity) {   // Notification from EV - when EV has left simulation (or completed charge)"""
+void ControlCentre::notifyEVState(EV* ev, EVState evState, Drone* drone, double capacity) {   // Notification from EV - when EV has left simulation (or completed charge)"""
     double charge = 0.0;
     switch (evState) {
     case EVState::DRIVING:            // means charge complete  so calculate charge
     case EVState::CHARGEBROKENOFF:    // drone broke off charge so should have an entry in self.startChargeEV
         if (startChargeEV.find(ev) != startChargeEV.end()) {
-            charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * Drone::WhEVChargeRatePerTimeStep;
+            charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
             startChargeEV.erase(ev);
         }
         break;
@@ -240,7 +237,7 @@ void ControlCentre::notifyEVState(EV* ev, EVState evState, string droneID, doubl
     case EVState::LEFTSIMULATION:
         if (startChargeEV.find(ev) != startChargeEV.end()) {
             if (startChargeEV[ev] > 0)
-                charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * Drone::WhEVChargeRatePerTimeStep;
+                charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
         }
         if (requests.find(ev) != requests.end()) {
             requests.erase(ev);
@@ -258,8 +255,12 @@ void ControlCentre::notifyEVState(EV* ev, EVState evState, string droneID, doubl
         break;
     }
 
-    if (GlobalFlags::myChargePrint)
-        GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" <<  ev->getID() << "\t" << evState << "\t" << droneID << "\t" << capacity << "\t" << charge << endl;
+    if (GlobalFlags::myChargePrint) {
+        string droneID = "-";
+        if (drone != nullptr)
+            droneID = drone->getID();
+        GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" << ev->getID() << "\t" << evState << "\t" << droneID << "\t" << capacity << "\t" << charge << endl;
+    }
 }
 
 bool droneCmp(const Drone* lurg, const Drone* rurg)
@@ -267,14 +268,14 @@ bool droneCmp(const Drone* lurg, const Drone* rurg)
     return stoi(lurg->getID().substr(1)) < stoi(rurg->getID().substr(1));
 }
 
-void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Print out Drone and EV statistics for the complete run"""
+void ControlCentre::printDroneStatistics(bool brief, string version, string runstring) {   //Print out Drone and EV statistics for the complete run"""
     // compute drone statistic totals
     int tmyFlyingCount = 0;           // used to compute distance travelled
     int tmyFullCharges = 0;           // count of complete charges
     int tmyBrokenCharges = 0;         // count of charges broken off - either by me out of charge
     int tmyBrokenEVCharges = 0;       // count of charges broken off - by EV leaving
-    double tmyFlyingKWh = 0.0;           // wH i've used flying
-    double tmyChargingKWh = 0.0;         // wH i've used charging EVs
+    double tmyFlyingKWh = 0.0;           // KWh i've used flying
+    double tmyChargingKWh = 0.0;         // KWh I've used charging EVs
     int tmyChargeMeFlyingCount = 0;   // wh i've charged my flying battery
     int tmyChargeMeCount = 0;         // wh i've used charging my EV charging battery
     double tmyResidualChargeKWh = 0.0;   // Wh left in charge battery at end
@@ -282,25 +283,33 @@ void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Pri
     int tmyChaseCount = 0;            // no of successful chases(ie successfully got from rendezvous to EV)
     int tmyBrokenChaseCount = 0;      // no of broken chases(vehicle left after rendezvous but before drone got there)
     int tmyChaseSteps = 0;            // steps for succesful chases - used to compute average chase time
-    // print("lenfree", len(self.freeDrones | self.needChargeDrones | set(self.allocatedDrone)))
-    // print("lenset", len(set(self.freeDrones | self.needChargeDrones | set(self.allocatedDrone))))
 
-    //for drone in self.freeDrones | self.needChargeDrones | set(self.allocatedDrone) :
     set<Drone*, decltype(droneCmp)*> allDrones(droneCmp);
     merge(freeDrones.begin(), freeDrones.end(), needChargeDrones.begin(), needChargeDrones.end(),
         inserter(allDrones, allDrones.begin()));
     for (auto alloc : allocatedDrone)
         allDrones.insert(alloc.first);
 
+    double tDroneDistance = 0.0;
+    double tmyChargeMeFlyingKWh = 0.0;
+    double tmyChargeMeKWh = 0.0;
+
     for (auto drone : allDrones) {
         tmyFlyingCount += drone->myFlyingCount;
+        tmyFlyingKWh += (drone->myFlyingCount * drone->myDt->droneFlyingWhperTimeStep);
+
+        tDroneDistance += (drone->myFlyingCount * drone->myDt->droneStepMperTimeStep);
+ 
         tmyFullCharges += drone->myFullCharges;
         tmyBrokenCharges += drone->myBrokenCharges;
         tmyBrokenEVCharges += drone->myBrokenEVCharges;
-        tmyFlyingKWh += drone->myFlyingWh;
-        tmyChargingKWh += drone->myChargingWh;
+        
+        tmyChargingKWh += (drone->myEVChargingCount * drone->myDt->WhEVChargeRatePerTimeStep);
         tmyChargeMeFlyingCount += drone->myChargeMeFlyingCount;
+        tmyChargeMeFlyingKWh += (drone->myChargeMeFlyingCount * drone->myDt->WhDroneRechargePerTimeStep);
         tmyChargeMeCount += drone->myChargeMeCount;
+        tmyChargeMeKWh += drone->myChargeMeCount * drone->myDt->WhDroneRechargePerTimeStep;
+ 
         tmyResidualFlyingKWh += drone->myFlyingCharge;
         tmyResidualChargeKWh += drone->myCharge;
 
@@ -310,13 +319,12 @@ void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Pri
             tmyChaseSteps += drone->myChaseSteps;
         }
     }
-    double tDroneDistance = tmyFlyingCount * (Drone::droneStepMperTimeStep / 1000.);
-    // alternative computation - avoiding errors from addition of large no of floating point
-    // tmyFlyingKWh = tmyFlyingCount * Drone::droneFlyingWhperTimeStep / 1000.
+
+    tDroneDistance /= 1000.;
     tmyFlyingKWh /= 1000.;
     tmyChargingKWh /= 1000.;
-    double tmyChargeMeFlyingKWh = tmyChargeMeFlyingCount * Drone::WhDroneRechargePerTimeStep / 1000.;
-    double tmyChargeMeKWh = tmyChargeMeCount * Drone::WhDroneRechargePerTimeStep / 1000.;
+    tmyChargeMeFlyingKWh /= 1000.;
+    tmyChargeMeKWh /= 1000.;
     tmyResidualFlyingKWh /= 1000;
     tmyResidualChargeKWh /= 1000.;
 
@@ -361,12 +369,12 @@ void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Pri
         cout << flags << wEnergy << "\t" << wUrgency << "\t" << proximityRadius << "\t" << GlobalFlags::ss->timeStep << "\t"
             << spawnedDrones << "\t" << tDroneDistance << "\t" << tmyFlyingKWh << "\t" << tmyChargingKWh << "\t"
             << tmyChargeMeFlyingKWh << "\t" << tmyChargeMeKWh << "\t" << tmyResidualFlyingKWh << "\t" << tmyResidualChargeKWh << "\t"
-            << EV::evCount << "\t" << EV::evChargeSteps * Drone::WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
+            << EV::evCount << "\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
             << tmyFullCharges << "\t" << tmyBrokenCharges << "\t" << tmyBrokenEVCharges << "\t";
         if (GlobalFlags::myModelRendezvous)
-            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring  << "\t" << sumoVersion << endl;
+            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring  << "\t" << version << "\t" << sumoVersion << endl;
         else
-            cout << "\t\t\t\t" << runstring << "\t" << sumoVersion << endl;
+            cout << "\t\t\t\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
 
     }
     else {
@@ -394,7 +402,7 @@ void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Pri
         cout << "\tDrone Charger usage:\n\t\tFlying KWh:\t" << tmyChargeMeFlyingKWh << "\n\t\tCharge KWh: \t" << tmyChargeMeKWh << endl;
         cout << "\tResiduals:\n\t\tFlying KWh:\t" << tmyResidualFlyingKWh << "\n\t\tCharging KWh: \t" << tmyResidualChargeKWh << endl;
         cout << std::setprecision(1);
-        cout << "\n\tEV Totals: (" << EV::evCount << ")\n\t\tCharge KWh:\t" << EV::evChargeSteps * Drone::WhEVChargeRatePerTimeStep / 1000. << endl;
+        cout << "\n\tEV Totals: (" << EV::evCount << ")\n\t\tCharge KWh:\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << endl;
         cout << "\t\tCharge Gap KWh: " << EV::evChargeGap / (1000. * EV::evCount) << endl;
         cout << "\t\tCharge Sessions:\n\t\t\tFull charges:\t" << tmyFullCharges << "\n\t\t\tPart (drone):\t" << tmyBrokenCharges << "\n\t\t\tPart (ev) :\t" << tmyBrokenEVCharges << endl;
 
@@ -404,9 +412,9 @@ void ControlCentre::printDroneStatistics(bool brief, string runstring) {   //Pri
         cout << "\nDiscrete Drone data:" << endl;
         cout << std::setprecision(2);
         for (auto drone : allDrones) {
-            double droneDistance = drone->myFlyingCount * Drone::droneStepMperTimeStep / 1000.;
-            double droneFlyingKWh = drone->myFlyingWh / 1000.;
-            double droneChargeKWh = drone->myChargingWh / 1000.;
+            double droneDistance = drone->myFlyingCount * drone->myDt->droneStepMperTimeStep / 1000.;
+            double droneFlyingKWh = drone->myFlyingCount * drone->myDt->droneFlyingWhperTimeStep / 1000.;
+            double droneChargeKWh = drone->myEVChargingCount * drone->myDt->WhEVChargeRatePerTimeStep / 1000.;
             cout << "\tdrone: " << drone->getID() << "\tKm: " << droneDistance << "\tCharge KW: " << droneChargeKWh;
             cout << "\tFlyingKW: " << droneFlyingKWh << "\tResidual (chargeWh: " << drone->myCharge << "\tflyingWh: " << drone->myFlyingCharge << ")" << endl;
         }
@@ -418,7 +426,6 @@ void ControlCentre::requestCharge(EV* ev, double capacity, double requestedWh = 
     if (GlobalFlags::myChargePrint)
         GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requestedWh << endl;
  }
-
 
 void ControlCentre::update() { //Management of 'control centre' executed by simulation on every step
     size_t availableDrones = freeDrones.size() + maxDrones - spawnedDrones;

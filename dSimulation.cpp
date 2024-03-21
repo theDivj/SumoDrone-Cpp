@@ -8,12 +8,12 @@ using namespace std;
 #include "Drone.h"
 #include <iostream>
 
-dSimulation::dSimulation(const vector<string> sumoCmd, int maxEVs) {
- 
-    Simulation::start(sumoCmd);
-    stepSecs = Simulation::getDeltaT();
-    Drone::stepSecsAdjust(stepSecs);
-    dSimulation::maxEVs = maxEVs;
+dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
+    try {
+        Simulation::start(sumoCmd);
+    } catch (const std::exception& err) { cerr << "start failed: " << err.what() << endl; }
+    dSimulation::stepSecs = Simulation::getDeltaT();
+    dSimulation::maxEVs = pmaxEVs;
     if (Simulation::getOption("chargingstations-output").length() > 1)
         useChargeHubs = true;
     else
@@ -45,6 +45,12 @@ bool dSimulation::dStep() {        //Simulation step
                 }
             }
         }
+       /* auto tlist = Simulation::getStartingTeleportIDList();
+        if (tlist.size() > 0) {
+            for (auto str : tlist)
+                cerr << timeStep << "\t"<< str << "\t";
+            cerr << endl;
+        }*/
 
         for (auto& vehID : dSimulation::EVs) { // run the update(state machine) for each EV  we are managing
             vehID.second->update();

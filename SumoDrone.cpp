@@ -8,6 +8,7 @@
 #include "argparse.h"
 #include "Drone.h"
 #include "GlobalFlags.h"
+#include "dSimulation.h"
 
 
 using namespace libsumo;
@@ -26,7 +27,7 @@ SumoDrone::SumoDrone() {
 }
 
 SumoDrone::~SumoDrone() {
-    gg->cc->printDroneStatistics(briefStatistics, this->runstring);
+    gg->cc->printDroneStatistics(briefStatistics, this -> version, this->runstring);
 }
 
 GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
@@ -88,6 +89,9 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     program.add_argument("--wu", "--wUrgency")
         .help("weighting to apply to nearest vehicle urgency, default 0")
         .default_value(0.0).scan<'g', double>();
+   
+    program.add_argument("--z", "--zeroDrone")
+        .help("Only use drones defined in the ...add.xml file").flag();
 
     try {
         program.parse_args(argc, argv);
@@ -105,6 +109,11 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     bool onlyChargeOnce = true;
     if (program["multipleCharge"] == true)
         onlyChargeOnce = false;
+
+    bool zeroDrone = false;
+    if (program["zeroDrone"] == true)
+        zeroDrone = true;
+
 
     auto chargeLog = program.get<string>("--chargeFile");
     auto droneLog = program.get<string>("--droneLog");
@@ -126,11 +135,20 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     // create our management objects 
     dSimulation* ss = new dSimulation(sumoCmd, maxEVs);
     ChargeHubs* ch = new ChargeHubs();
-    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones, droneType);
+    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones);
 
     // setup globals
     gg = new GlobalFlags(ss, ch, cc);
     gg->setGlobals(droneKmPerHr, randomSeed, droneLog, chargeLog, onlyChargeOnce, modelRendezvous);
+
+    Drone::setDroneType(droneType);                         // set type as passed in runstring
+    int poiDrones = Drone::setDroneTypeFromPOI(zeroDrone);  // set type(s) as set in POI definitions
+    if (zeroDrone) {
+        if (poiDrones > 0)
+            cc->setMaxDrones(poiDrones);
+        else
+            cerr << "Warning: No drones found in POI - defaulting to " << maxDrones << " drones" << endl;
+    }
 
     // any output file would have been opened in parse_args() - write out the title line if needed
     if (GlobalFlags::myDronePrint)
@@ -161,6 +179,7 @@ int main(int argc, char* argv[]) {
        runstring += std::string(" ") + std::string(argv[i]);
 
     session->runstring = runstring;
+    session->version = "v3.3 20th March 2024";
 
     GlobalFlags* gg = session->parseRunstring(argc, argv);
 

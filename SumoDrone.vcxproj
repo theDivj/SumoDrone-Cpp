@@ -145,6 +145,7 @@
     <ClCompile Include="ChargeHubs.cpp" />
     <ClCompile Include="ControlCentre.cpp" />
     <ClCompile Include="Drone.cpp" />
+    <ClCompile Include="DroneType.cpp" />
     <ClCompile Include="dSimulation.cpp" />
     <ClCompile Include="EV.cpp" />
     <ClCompile Include="EVState.h" />
@@ -159,6 +160,7 @@
     <ClInclude Include="ControlCentre.h" />
     <ClInclude Include="Drone.h" />
     <ClInclude Include="DroneState.h" />
+    <ClInclude Include="DroneType.h" />
     <ClInclude Include="dSimulation.h" />
     <ClInclude Include="EV.h" />
     <ClInclude Include="GlobalFlags.h" />

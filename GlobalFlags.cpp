@@ -10,7 +10,7 @@ void GlobalFlags::setGlobals(double droneKmPerHr, unsigned int randomSeed, std::
     myModelRendezvous = modelRendezvous;
 
     if (randomSeed != 0) {
-        myRandom = std::default_random_engine(randomSeed);
+        srand(randomSeed);
         myUseRandom = true;
     }
 

@@ -5,20 +5,41 @@
 #include <cmath>
 #include <exception>
 #include <iomanip>
+#include <vector>
+#include <iostream>
+#include "DroneType.h"
 
 using namespace libsumo;
 using namespace std;
 
+// initialise class variables
+int Drone::droneIDCount = 0;
+bool Drone::parkAtHome = false;
+bool Drone::dummyEVCreated = false;
+DroneType* Drone::d0Type = new DroneType;
 
-Drone::Drone(TraCIPosition pos, string droneType = "ehang184") {
-    Drone::droneIDCount += 1;
-    Drone::setDroneType(droneType);   // should we be setting this on each drone call - it sets the class variables
-    myID = "d" + to_string(Drone::droneIDCount);
+bool Drone::printedType = false;
+
+Drone::Drone(TraCIPosition pos, string poi, DroneType* DT) {
+    if (poi.empty()) {    // drones created from defaults
+        Drone::droneIDCount += 1;
+        myDt = d0Type;
+        myID = "d" + to_string(Drone::droneIDCount);
+    }
+    else {                           // drones being created when zeroDrone is true - ie from POIs
+        Drone::droneIDCount += 1;    // just to keep a count of drones - not to be used to create name
+        myID = poi;
+        myDt = DT;
+    }
+
+    myDt->droneKMperh = GlobalFlags::myDroneKmPerHr;
+    myDt->setDerived(GlobalFlags::ss->stepSecs);
+
     myPosition = pos;
     myParkPosition = myPosition;
     //myParkEP;
-    myCharge = Drone::droneChargeWh;
-    myFlyingCharge = Drone::droneFlyingWh;
+    myCharge = myDt->droneChargeWh;              
+    myFlyingCharge = myDt->droneFlyingWh;
     myViableCharge = true;
     myState = DroneState::NULLSTATE;
     myEV = nullptr;
@@ -28,8 +49,7 @@ Drone::Drone(TraCIPosition pos, string droneType = "ehang184") {
     myFullCharges = 0;             // count of complete charges
     myBrokenCharges = 0;           // count of charges broken off - by me out of charge
     myBrokenEVCharges = 0;         // count of charges broken off - by EV(leaving)
-    myFlyingWh = 0.0;              // wH i've used flying
-    myChargingWh = 0.0;            // wH i've used charging EVs
+    myEVChargingCount = 0;            // Count of timesteps charging EVs
     myChargeMeFlyingCount = 0;   // wh i've charged my flying battery
     myChargeMeCount = 0;         // wh i've used charging my EV charging battery
     myChaseCount = 0;              // count of complete chases - ie got from rendezvous to ev
@@ -37,68 +57,156 @@ Drone::Drone(TraCIPosition pos, string droneType = "ehang184") {
     myChaseSteps = 0;              // count of steps in all complete chases - used with myChaseCount to compute average
     myRequestedCharge = 0;         // the amount of charge requested by the EV
     myDummyEVInserted = false;     // whether the dummy EVs have been inserted
-        // finally create the POI representing our drone
-    POI::add(myID, pos.x, pos.y, { 0, 0, 255, 255 }, "", 250, "drone.png", 10, 10);
+        // finally create the POI representing our drone  - unless its alreday there from the add file(s)
+    if ( poi != myID )
+        POI::add(myID, pos.x, pos.y, myDt->droneColour, "", 250, myDt->droneImageFile, myDt->droneWidth, myDt->droneHeight);
+    else {
+        POI::setColor(myID, myDt->droneColour);
+        POI::setImageFile(myID, myDt->droneImageFile);
+        POI::setWidth(myID, myDt->droneWidth);
+        POI::setHeight(myID, myDt->droneHeight);
+    }
 
     if (GlobalFlags::ss->useChargeHubs and not dummyEVCreated)  
         createDummyEV();
+    //if (not Drone::printedType) {
+     //   cerr << *myDt << endl;
+     //   printedType = true;
+    //}
 }
 
-// initialise class variables
-int Drone::droneIDCount = 0;
-bool Drone::parkAtHome = false;
-
-double Drone::droneKMperh = 60.0;      // drone cruising speed - will be overridden by global / runstring value
-double Drone::droneChargeWh = 30000.;           // capacity of battery used to charge ev's  - based on Ehang 184 load capacity
-double Drone::droneFlyingWh = 14400.;           // capacity of battery used to power drone
-double Drone::droneFlyingWhperTimeStep = droneFlyingWh / (23 * 60.);  // power usage based on Ehang 184 which has battery capacity of 14.4 KW giving 23 mins flight time
-double Drone::droneChargeContingencyp = 0.05;   // minimum contingency level %
-double Drone::droneChargeViablep = 0.3;        // minimum viable level %
-double Drone::WhEVChargeRatePerTimeStep = 25000. / 3600;      // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
-double Drone::WhDroneRechargePerTimeStep = 75000. / 3600;     // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
-// Derived class variables
-double Drone::droneMperSec = Drone::droneKMperh / 3.6;
-double Drone::droneStepMperTimeStep = Drone::droneMperSec;                           // How far(metres) the drone will travel in one time step(adjust for timeStep when simulation starts)
-double Drone::droneStepM2 = pow(Drone::droneStepMperTimeStep,2);    // precompute - used in distance calculations(adjust for timeStep when simulation starts)
-double Drone::minDroneCharge = Drone::droneChargeContingencyp * Drone::droneChargeWh;  // Thresholds to break off charging / flying
-double Drone::minDroneFlyingWh = Drone::droneChargeContingencyp * Drone::droneFlyingWh;
-double Drone::viableDroneCharge = Drone::droneChargeViablep * Drone::droneChargeWh;    // thresholds to allow allocation - ie enough charge to be useful
-double Drone::viableDroneFlyingWh = Drone::droneChargeViablep * Drone::droneFlyingWh;
-bool Drone::dummyEVCreated = false;
-
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  static methods
 
 void Drone::setDroneType(std::string droneType="ehang184") {  // Support different drone definitions - initially to give us a drone that doesn't need charging"""
 
-    Drone::droneKMperh = GlobalFlags::getDroneSpeed(); // get speed override if any
+    d0Type->droneKMperh = GlobalFlags::getDroneSpeed(); // get speed override if any
 
     // EV charging battery size is constrained by drone carrying capacity * average battery energy density(currently ~150Wh / Kg)
     if (droneType == "ehang184x") {  // ehang 184 with artificially increased battery sizes so they don't need recharging
-        Drone::droneChargeWh = 3000000.0;    // 100 * actual
-        Drone::droneFlyingWh = 14400000.0;
-        Drone::droneFlyingWhperTimeStep = 14400 / (23 * 60.);
-        Drone::droneChargeContingencyp = 0.05;              // minimum contingency level %
-        Drone::droneChargeViablep = 0.3;                    // minimum viable level %
-        Drone::WhEVChargeRatePerTimeStep = 25000. / 3600;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
-        Drone::WhDroneRechargePerTimeStep = 75000. / 3600;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
+        d0Type->droneChargeWh = 3000000.0;    // 100 * actual
+        d0Type->droneFlyingWh = 14400000.0;
+        d0Type->droneFlyingWhperTimeStep = d0Type->droneFlyingWh / (23 * 60.);
+        d0Type->droneChargeContingencyp = 0.05;              // minimum contingency level %
+        d0Type->droneChargeViablep = 0.3;                    // minimum viable level %
+        d0Type->WhEVChargeRatePerTimeStep = 25000 / 3600.;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
+        d0Type->WhDroneRechargePerTimeStep = 75000 / 3600.;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
     }
     else {  // default "ehang184"
-        Drone::droneChargeWh = 30000.0;                      // capacity of battery used to charge ev's, based on Ehang 184 load capacity - 200Kg
-        Drone::droneFlyingWh = 14400.0;                      // capacity of battery used to power drone
-        Drone::droneFlyingWhperTimeStep = Drone::droneFlyingWh / (23 * 60.);   // Ehang 184 has battery capacity of 14.4 KW giving 23 mins flight time
-        Drone::droneChargeContingencyp = 0.05;              // minimum contingency level %
-        Drone::droneChargeViablep = 0.3;                    // minimum viable level %
-        Drone::WhEVChargeRatePerTimeStep = 25000. / 3600;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
-        Drone::WhDroneRechargePerTimeStep = 75000. / 3600;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
+        d0Type->droneChargeWh = 30000.0;                      // capacity of battery used to charge ev's, based on Ehang 184 load capacity - 200Kg
+        d0Type->droneFlyingWh = 14400.0;                      // capacity of battery used to power drone
+        d0Type->droneFlyingWhperTimeStep = d0Type->droneFlyingWh / (23 * 60.);   // Ehang 184 has battery capacity of 14.4 KW giving 23 mins flight time
+        d0Type->droneChargeContingencyp = 0.05;              // minimum contingency level %
+        d0Type->droneChargeViablep = 0.3;                    // minimum viable level %
+        d0Type->WhEVChargeRatePerTimeStep = 25000 / 3600.;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
+        d0Type->WhDroneRechargePerTimeStep = 75000 / 3600.;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
     }
-    Drone::droneMperSec = Drone::droneKMperh / 3.6;
-    Drone::droneStepMperTimeStep = Drone::droneMperSec;                            // How far(metres) the drone will travel in one time step(adjust for timeStep when simulation starts)
-    Drone::droneStepM2 = Drone::droneStepMperTimeStep * Drone::droneStepMperTimeStep;     // precompute - used in distance calculations(adjust for timeStep when simulation starts)
-    Drone::minDroneCharge = Drone::droneChargeContingencyp * Drone::droneChargeWh;     // Thresholds to break off charging / flying
-    Drone::minDroneFlyingWh = Drone::droneChargeContingencyp * Drone::droneFlyingWh;
-    Drone::viableDroneCharge = Drone::droneChargeViablep * Drone::droneChargeWh;     // thresholds to allow allocation - ie enough charge to be useful
-    Drone::viableDroneFlyingWh = Drone::droneChargeViablep * Drone::droneFlyingWh;
 }
 
+//retrieve drone parameters from Sumo POI d0 - returns true if parameters set otherwise false
+int Drone::setDroneTypeFromPOI(bool zeroDrone) {
+    // first set the defaults from d0 if it exists
+    vector<string> POIlist = POI::getIDList();
+    if (POIlist.size() > 0)
+        for (string poi : POIlist) {
+            if (poi == "d0") {
+                double dWidth = POI::getWidth(poi);
+                if (dWidth > 1.) Drone::d0Type->droneWidth = dWidth;
+                double dHeight = POI::getHeight(poi);
+                if (dHeight > 1.) Drone::d0Type->droneHeight = dHeight;
+                TraCIColor dColor = POI::getColor(poi);
+                if (dColor.getString().size() > 1) Drone::d0Type->droneColour = dColor;
+                string dImageFile = POI::getImageFile(poi);
+                if (dImageFile.size() > 1) Drone::d0Type->droneImageFile = dImageFile;
+
+                string dDroneKMperh = POI::getParameter(poi, "droneKMperh");
+                if (dDroneKMperh.size() > 1) Drone::d0Type->droneKMperh = stod(dDroneKMperh);
+
+                string dDroneChargeWh = POI::getParameter(poi, "droneChargeWh");
+                if (dDroneChargeWh.size() > 1) Drone::d0Type->droneChargeWh = stod(dDroneChargeWh);
+
+                string dDroneFlyingWh = POI::getParameter(poi, "droneFlyingWh");
+                if (dDroneFlyingWh.size() > 1) Drone::d0Type->droneFlyingWh = stod(dDroneFlyingWh);
+
+                string dDroneFlyingMinutes = POI::getParameter(poi, "droneFlyingMinutes");
+                if (dDroneFlyingMinutes.size() > 1) Drone::d0Type->droneFlyingWhperTimeStep = Drone::d0Type->droneFlyingWh/(60. * stoi(dDroneFlyingMinutes));
+
+                string dDroneChargeContingencyp = POI::getParameter(poi, "droneChargeContingencyp");
+                if (dDroneChargeContingencyp.size() > 1) Drone::d0Type->droneChargeContingencyp = stod(dDroneChargeContingencyp);
+
+                string dDroneChargeViablep = POI::getParameter(poi, "droneChargeViablep");
+                if (dDroneChargeViablep.size() > 1) Drone::d0Type->droneChargeViablep = stod(dDroneChargeViablep);
+
+                string dWhEVChargeRate = POI::getParameter(poi, "WhEVChargeRate");
+                if (dWhEVChargeRate.size() > 1) Drone::d0Type->WhEVChargeRatePerTimeStep = stoi(dWhEVChargeRate)/3600.;
+
+                string dWhDroneRechargeRate = POI::getParameter(poi, "WhDroneRechargeRate");
+                if (dWhDroneRechargeRate.size() > 1) Drone::d0Type->WhDroneRechargePerTimeStep = stoi(dWhDroneRechargeRate)/3600.;
+
+                POI::remove(poi);
+                if (not zeroDrone){
+                    return 1;  // ie we've set the d0Type so can return
+                }
+            }
+        }
+    // if zeroDrone is set then initialise from any drone definitions in simulation
+    //  retrieve the list again because we should have removed d0
+    int poiDroneCount = 0;
+    POIlist = POI::getIDList(); 
+    if (zeroDrone and POIlist.size() > 0) {
+        for (string poi : POIlist) {
+            if (POI::getType(poi) == "drone") {   // weve removed the d0 drone
+                DroneType* DT = new DroneType;
+                double dWidth = POI::getWidth(poi);
+                if (dWidth > 1.) DT->droneWidth = dWidth;
+                double dHeight = POI::getHeight(poi);
+                if (dHeight > 1.) DT->droneHeight = dHeight;
+                TraCIColor dColor = POI::getColor(poi);
+                if (dColor.getString().size() > 1) DT->droneColour = dColor;
+                string dImageFile = POI::getImageFile(poi);
+                if (dImageFile.size() > 1) DT->droneImageFile = dImageFile;
+
+                string dDroneKMperh = POI::getParameter(poi, "droneKMperh");
+                if (dDroneKMperh.size() > 1) DT->droneKMperh = stod(dDroneKMperh);
+
+                string dDroneChargeWh = POI::getParameter(poi, "droneChargeWh");
+                if (dDroneChargeWh.size() > 1) DT->droneChargeWh = stod(dDroneChargeWh);
+
+                string dDroneFlyingWh = POI::getParameter(poi, "droneFlyingWh");
+                if (dDroneFlyingWh.size() > 1) DT->droneFlyingWh = stod(dDroneFlyingWh);
+
+                string dDroneFlyingMinutes = POI::getParameter(poi, "droneFlyingMinutes");
+                if (dDroneFlyingMinutes.size() > 1) DT->droneFlyingWhperTimeStep = DT->droneFlyingWh / (60. * stoi(dDroneFlyingMinutes));
+
+                string dDroneChargeContingencyp = POI::getParameter(poi, "droneChargeContingencyp");
+                if (dDroneChargeContingencyp.size() > 1) DT->droneChargeContingencyp = stod(dDroneChargeContingencyp);
+
+                string dDroneChargeViablep = POI::getParameter(poi, "droneChargeViablep");
+                if (dDroneChargeViablep.size() > 1) DT->droneChargeViablep = stod(dDroneChargeViablep);
+
+                string dWhEVChargeRate = POI::getParameter(poi, "WhEVChargeRate");
+                if (dWhEVChargeRate.size() > 1) DT->WhEVChargeRatePerTimeStep = stoi(dWhEVChargeRate) / 3600.;
+
+                string dWhDroneRechargeRate = POI::getParameter(poi, "WhDroneRechargeRate");
+                if (dWhDroneRechargeRate.size() > 1) DT->WhDroneRechargePerTimeStep = stoi(dWhDroneRechargeRate) / 3600.;
+ 
+                // create the drone
+                try {
+                    TraCIPosition pos = POI::getPosition(poi);
+                    GlobalFlags::cc->freeDrones.insert(new Drone(pos, poi, DT));
+                    poiDroneCount += 1;
+                }
+                catch (const std::exception& err) { cerr << "Drone " + poi + " creation failed. :-" << err.what() << endl; }
+            }
+        }
+        return poiDroneCount;
+    }
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//  members
+//
 bool Drone::allocate(EV* ev, double requestedCharge) { // allocate this instance to an EV"""
     switch (myState) {
     case DroneState::CHARGINGDRONE:
@@ -121,17 +229,17 @@ bool Drone::allocate(EV* ev, double requestedCharge) { // allocate this instance
 }
 
 void Drone::chargeMe() {   // Drone at hub - charge if needed"""
-    if (myCharge < Drone::droneChargeWh) {
-        myCharge += Drone::WhDroneRechargePerTimeStep;
+    if (myCharge < myDt->droneChargeWh) {
+        myCharge += myDt->WhDroneRechargePerTimeStep;
         myChargeMeCount += 1;
     }
-    if (myFlyingCharge < Drone::droneFlyingWh) {
-        myFlyingCharge += Drone::WhDroneRechargePerTimeStep;
+    if (myFlyingCharge < myDt->droneFlyingWh) {
+        myFlyingCharge += myDt->WhDroneRechargePerTimeStep;
         myChargeMeFlyingCount += 1;
     }
-    else if (myCharge >= Drone::droneChargeWh) { // fully charged so move to null state, avoiding calls to chargeMe
-        // myCharge = Drone::droneChargeWh;
-        // myFlyingCharge = Drone::droneFlyingWh;
+    else if (myCharge >= myDt->droneChargeWh) { // fully charged so move to null state, avoiding calls to chargeMe
+        // myCharge = myDt->droneChargeWh;
+        // myFlyingCharge = myDt->droneFlyingWh;
         dummyEVHide();
         myState = DroneState::NULLSTATE;
         setViableCharge();
@@ -148,16 +256,25 @@ void Drone::createDummyEV() {  // Create an EV type to use at charging stations 
     VehicleType::setParameter("Drone", "has.battery.device", "True");
     VehicleType::setEmissionClass("Drone", "Energy/unknown");
     Drone::dummyEVCreated = true;
+
 }
 
 void Drone::dummyEVHide() {  // remove the dummy EVs""";
     if (GlobalFlags::ss->useChargeHubs and myDummyEVInserted) {
         string dummyFB = myID + "-FB";
-        Vehicle::resume(dummyFB);
-        Vehicle::remove(dummyFB);
+        try {
+            Vehicle::resume(dummyFB);
+            Vehicle::remove(dummyFB);
+        }
+        catch (const std::exception& err) { cerr << "hiding -" + dummyFB << err.what() << endl; }   
+        
         string dummyCB = myID + "-CB";
-        Vehicle::resume(dummyCB);
-        Vehicle::remove(dummyCB);
+        try {
+            Vehicle::resume(dummyCB);
+            Vehicle::remove(dummyCB);
+        }
+        catch (const std::exception& err) { cerr << "hiding -" + dummyCB << err.what() << endl; }
+
         myDummyEVInserted = false;
     }
 }
@@ -167,14 +284,14 @@ void Drone::dummyEVInsert() {  // If we are generating charge station output add
         string parkLane = myParkEP.edge + "_0";
         string dummyFB = myID + "-FB";
         Vehicle::add(dummyFB, myParkEP.edge, "Drone");
-        Vehicle::setParameter(dummyFB, "device.battery.maximumBatteryCapacity", to_string(Drone::droneFlyingWh));
+        Vehicle::setParameter(dummyFB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneFlyingWh));
         Vehicle::setParameter(dummyFB, "device.battery.actualBatteryCapacity", to_string(myFlyingCharge));
         Vehicle::moveTo(dummyFB, parkLane, myParkEP.epos);
         Vehicle::setStop(dummyFB, myParkEP.edge, myParkEP.epos, 0, 10000.0, 1);
-
+        
         string dummyCB = myID + "-CB";
         Vehicle::add(dummyCB, myParkEP.edge, "Drone");
-        Vehicle::setParameter(dummyCB, "device.battery.maximumBatteryCapacity", to_string(Drone::droneChargeWh));
+        Vehicle::setParameter(dummyCB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneChargeWh));
         Vehicle::setParameter(dummyCB, "device.battery.actualBatteryCapacity", to_string(myCharge));
         Vehicle::moveTo(dummyCB, parkLane, myParkEP.epos + 0.5);
         Vehicle::setStop(dummyCB, myParkEP.edge, myParkEP.epos + 0.5, 0, 10000.0, 1);
@@ -207,7 +324,7 @@ bool Drone::fly(libsumo::TraCIPosition pos) {
         }
     }
     else {
-        x = abs(sqrt(droneStepM2 / (1.0 + pow(ddy/ddx, 2)) ));
+        x = abs(sqrt(myDt->droneStepM2 / (1.0 + pow(ddy/ddx, 2)) ));
         y = abs(x * ddy/ddx);
     }
 
@@ -250,7 +367,7 @@ void Drone::logLine(std::string activity) { // Output discrete changes in charge
     }
     GlobalFlags::myDroneLog << setprecision(1) << GlobalFlags::ss->timeStep << "\t" << myID << "\t" << evID << "\t";
     GlobalFlags::myDroneLog << setprecision(4) << lane + "\t" << lanePos<< "\t" << myPosition.x << "\t" << myPosition.y << "\t";
-    GlobalFlags::myDroneLog << setprecision(4) << myChargingWh << "\t" << myCharge << "\t" << myFlyingCharge << "\t" + activity << endl;
+    GlobalFlags::myDroneLog << setprecision(4) << myEVChargingCount * myDt->WhEVChargeRatePerTimeStep << "\t" << myCharge << "\t" << myFlyingCharge << "\t" + activity << endl;
 }
 
 void Drone::notifyChase(bool chaseOK, int chaseSteps) { // from EV updating chases by this drone"""
@@ -318,22 +435,14 @@ void Drone::setMyParkPosition() {  // configure my parking/charging position"""
 }
 
 void Drone::setViableCharge() {   // Check charge levels and see if we are viable - ie can be allocated"""
-    if (myCharge >= Drone::viableDroneCharge and myFlyingCharge >= Drone::viableDroneFlyingWh)
+    if (myCharge >= myDt->viableDroneCharge and myFlyingCharge >= myDt->viableDroneFlyingWh)
         if (not myViableCharge) {
             myViableCharge = true;
             GlobalFlags::cc->notifyDroneState(this);  // cc only interested when we become viable
-            POI::setColor(myID, { 0, 0, 255, 255 });
+            POI::setColor(myID, myDt->droneColour);
         }
     else
         myViableCharge = false;
-}
-
-void Drone::stepSecsAdjust(double stepSecs) {   // adjust timestep class variables for the actual timestep = no change when timeStep = 1sec"""
-    Drone::droneStepMperTimeStep *= stepSecs;
-    Drone::droneStepM2 = pow(Drone::droneStepMperTimeStep, 2);  // precompute - used in distance calculations
-    Drone::droneFlyingWhperTimeStep *= stepSecs;
-    Drone::WhEVChargeRatePerTimeStep *= stepSecs;
-    Drone::WhDroneRechargePerTimeStep *= stepSecs;
 }
 
 pair<bool,double> Drone::update(libsumo::TraCIPosition pos) { // primary update - invoked directly when EV is managing drone"""
@@ -397,7 +506,7 @@ pair<bool,double> Drone::update(libsumo::TraCIPosition pos) { // primary update 
     case DroneState::CHARGINGEV:
         fly(pos);                          // 'fly' in this case is just moving with attached to the ev
         if (usePower("chargeEV"))          // False when charge broken off or completed
-            updatePower = Drone::WhEVChargeRatePerTimeStep;
+            updatePower = myDt->WhEVChargeRatePerTimeStep;
         else {
             updateStatus = false;
         }
@@ -456,16 +565,15 @@ pair<bool,double> Drone::update(libsumo::TraCIPosition pos) { // primary update 
 bool Drone::usePower(std::string mode) {  // Am flying or charging an EV so adjust my charge levels"""
     bool breakOff = false;
     if (mode == "fly") {
-        myFlyingCharge -= Drone::droneFlyingWhperTimeStep;
-        myFlyingWh += Drone::droneFlyingWhperTimeStep;
+        myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
         myFlyingCount += 1;
-        if (myFlyingCharge < Drone::minDroneFlyingWh)
+        if (myFlyingCharge < myDt->minDroneFlyingWh)
             breakOff = true;
     }
     else if (mode == "chargeEV") {
-        myCharge -= Drone::WhEVChargeRatePerTimeStep;
-        myChargingWh += Drone::WhEVChargeRatePerTimeStep;
-        myRequestedCharge -= Drone::WhEVChargeRatePerTimeStep;
+        myCharge -= myDt->WhEVChargeRatePerTimeStep;
+        myEVChargingCount += 1;
+        myRequestedCharge -= myDt->WhEVChargeRatePerTimeStep;
         if (myRequestedCharge <= 0) { //  we've charged the requested amount
             myEV->stopCharging(0);   // don't clear, full charge
             myFullCharges += 1;
@@ -473,13 +581,13 @@ bool Drone::usePower(std::string mode) {  // Am flying or charging an EV so adju
             park();
             return false;  // ie we're not returning a charge
             }  
-        if (myCharge < Drone::minDroneCharge)
+        if (myCharge < myDt->minDroneCharge)
             breakOff = true;
     }
     else {
         if (myState == DroneState::FLYINGTOCHARGE) {  // we're flying back to charge, only time we get here for now
             myFlyingCount += 1;
-            myFlyingCharge -= Drone::droneFlyingWhperTimeStep;
+            myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
         }
     }
 
