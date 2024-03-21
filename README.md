@@ -15,4 +15,8 @@
 
   In sumo-gui, vehicles and drones turn red when they need charging and green when they are actually charging.
   
+---
+  > Note that the charge "requested" by the ev defaults to 2kW. This can be modified by use of a vehicle or vehicleType parameter:  chargeRequestWh
+        eg \<param key="chargeRequestWh" value="10000"/\>   would set a charge request size of 10kW.  In all cases use of the -r option varies the request by +/- 30%
+---
    This version was created to compare the performance of libsumo versus python traci.
