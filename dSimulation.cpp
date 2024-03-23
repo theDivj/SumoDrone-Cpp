@@ -18,12 +18,27 @@ dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
         useChargeHubs = true;
     else
         useChargeHubs = false;
+
+    usingSumogui = false;   // see if we are using sumo-gui/sumo-gui.exe
+    for (string str : sumoCmd)
+        if (str.find("sumo-gui") != string::npos)
+            usingSumogui = true;
 }
 
 bool dSimulation::dStep() {        //Simulation step
     if (Simulation::getMinExpectedNumber() > 0) {
         Simulation::executeMove();                     //  move vehicles first so we can move drones to the same position
         dSimulation::timeStep += 1;
+
+        if (!usingSumogui) {    // let them know we're working
+            int op = int(dSimulation::timeStep / 200) * 200;
+            if (op == dSimulation::timeStep) { 
+                cerr << ".";
+                op = int(dSimulation::timeStep / 16000) * 16000;   // new line every 80 dots
+                if (op == dSimulation::timeStep)
+                    cerr << endl;
+            }
+        }
 
         if (Simulation::getLoadedNumber() > 0) {
             vector <string> loadedVehicles = Simulation::getLoadedIDList();     // add new EVs to our management list upto the maximum allowed

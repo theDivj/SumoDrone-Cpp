@@ -15,6 +15,8 @@ public:
 
     static inline std::unordered_map<std::string,EV*> EVs;
 
+    static inline bool usingSumogui;
+
     dSimulation(const std::vector<std::string> sumoCmd, int maxEVs);
 
     dSimulation() = default;

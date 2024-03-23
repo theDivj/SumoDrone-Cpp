@@ -38,9 +38,17 @@ std::set<urgency, decltype(urgencyCmp)* > urgency::calcUrgency() {
 
             pair<hubLocation, double> hDist = GlobalFlags::ch->findNearestHub(evPos);
             //# hub, hubDistance = GG.ch.findNearestHubDriving(evID)
-            double evRange = stod(Vehicle::getParameter(evID, "device.battery.actualBatteryCapacity")) * ev.first->getMyKmPerWh();
-            //cout << "nearest Hub:" << hDist.first.id << "\t" << hDist.second << "\t"<< evRange <<endl; // ***
 
+            double evRange = 200.0; 
+            if (ControlCentre::wUrgency > 0.0) {   // if we have an ugency weight then we need to calculate the range
+                double distance = Vehicle::getDistance(evID);
+                if (distance > 10000) {   // can compute real range after we've been driving for a while - arbitrary 10km
+                    double mWh = distance / stod(Vehicle::getParameter(evID, "device.battery.totalEnergyConsumed"));
+                    evRange = stod(Vehicle::getParameter(evID, "device.battery.actualBatteryCapacity")) * mWh / 1000.;
+                }
+                else   // otherwise just a guesstimate
+                    evRange = stod(Vehicle::getParameter(evID, "device.battery.actualBatteryCapacity")) * ev.first->getMyKmPerWh();
+            }
             double proximity = 1.0;
             double urgencyv = 1.0;
             if (ControlCentre::wEnergy != 0.0) {       // We have a weight so need to calculate proximity

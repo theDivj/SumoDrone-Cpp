@@ -54,10 +54,10 @@ public:
     }
 
     void captureStats() const {    // Add statistics for this vehicle into class variables - called when EV leaves
-        EV::evChargeGap += (EV::chargeDoneThreshold - myCapacity);
+        EV::evChargeGap += (myChargeDone - myCapacity);
         EV::evChargeCount += myChargeCount;
         EV::evChargeSteps += myChargeSteps;
-    }
+   }
 
     std::string getID() const {    // getter function for EV identity
         return myID;
@@ -66,6 +66,8 @@ public:
     double getMyKmPerWh() const {  // getter for my average usage
         return myKmPerWh;
     }
+
+    void setEVOverrides(std::string vehID);   // pick up any overrides from add.xml file(s)
 
     libsumo::TraCIPosition getMyPosition() const {   // getter function for x, y position
         return myPosition;

@@ -11,6 +11,18 @@
 using namespace libsumo;
 using namespace std;
 
+// initialize class variables
+double EV::chargeNeededThreshold = 30000.0;
+double EV::chargeDoneThreshold = 32000.0;
+double EV::evChargeRequestWh = 2000.0;
+double EV::pRandomVariation = 0.30;
+double EV::kmPerWh = 6.5 / 1000.0;
+
+int EV::evCount = 0;
+int EV::evChargeSteps = 0;
+double EV::evChargeGap = 0.0;
+int EV::evChargeCount = 0;
+
 EV::EV(const std::string& evID, double kmPerWh) {
 
     if (kmPerWh <= 0.0) {
@@ -28,13 +40,30 @@ EV::EV(const std::string& evID, double kmPerWh) {
     myChargeCount = 0;
     myChargeSteps = 0;
     myChaseSteps = 0;
-    myCapacity = chargeDoneThreshold;
-    myChargeNeededThreshold = chargeNeededThreshold;
+    myCapacity = EV::chargeDoneThreshold;
+    
+    myChargeNeededThreshold = EV::chargeNeededThreshold;
+    myevChargeRequestWh = EV::evChargeRequestWh;
  
+    //setEVOverrides(myID);
+
+    if (GlobalFlags::usingRandom()) {
+        double variation = pRandomVariation * myevChargeRequestWh;
+        variation *= ((2. * (rand()/double(RAND_MAX))) - 1.);
+        myChargeNeededThreshold = myChargeNeededThreshold + variation + 1000. * rand()/double(RAND_MAX) - 500;
+        myevChargeRequestWh += variation;
+    }
+    myChargeDone = myChargeNeededThreshold + myevChargeRequestWh;
+    myLastChargeRequest = myevChargeRequestWh;
+    evCount++;
+}
+
+
+void EV::setEVOverrides(string vehID) {
     // check to see if we have an override defined for charge request - could be in type or vehicle definition - vehicle takes precedence
-    string vType = Vehicle::getTypeID(evID); 
-    string overrideChargeWh = VehicleType::getParameter(vType,"chargeRequestWh");
-    string vehicleOverrideChargeWh = Vehicle::getParameter(evID, "chargeRequestWh");
+    string vType = Vehicle::getTypeID(vehID);
+    string overrideChargeWh = VehicleType::getParameter(vType, "chargeRequestWh");
+    string vehicleOverrideChargeWh = Vehicle::getParameter(vehID, "chargeRequestWh");
     double oWh = 0.;
     if (overrideChargeWh.size() > 1)
         oWh = stod(overrideChargeWh);
@@ -42,31 +71,17 @@ EV::EV(const std::string& evID, double kmPerWh) {
         oWh = stod(vehicleOverrideChargeWh);
     if (oWh > 1)
         myevChargeRequestWh = oWh;
-    else
-        myevChargeRequestWh = evChargeRequestWh;
 
-    if (GlobalFlags::usingRandom()) {
-        double variation = pRandomVariation * myevChargeRequestWh;
-        variation *= ((2. * (rand()/double(RAND_MAX))) - 1.);
-        myChargeNeededThreshold = chargeNeededThreshold + variation + 1000. * rand()/double(RAND_MAX) - 500;
-        myevChargeRequestWh += variation;
-    }
-    myChargeDone = chargeDoneThreshold;
-    myLastChargeRequest = myevChargeRequestWh;
-    evCount++;
+    string overrideChargeRequestThresholdWh = VehicleType::getParameter(vType, "chargeRequestThresholdWh");
+    string vehicleChargeRequestThresholdWh = Vehicle::getParameter(vehID, "chargeRequestThresholdWh");
+    oWh = 0.;
+    if (overrideChargeRequestThresholdWh.size() > 1)
+        oWh = stod(overrideChargeRequestThresholdWh);
+    if (vehicleChargeRequestThresholdWh.size() > 1)
+        oWh = stod(vehicleChargeRequestThresholdWh);
+    if (oWh > 5000)
+        myChargeNeededThreshold = oWh;
 }
-
-
-// initialize class variables
-double EV::chargeNeededThreshold = 30000.0;
-double EV::chargeDoneThreshold = 32000.0;
-double EV::evChargeRequestWh = 2000.0;
-double EV::pRandomVariation = 0.30;
-double EV::kmPerWh = 6.5 / 1000.0;
-int EV::evCount = 0;
-int EV::evChargeSteps = 0;
-double EV::evChargeGap = 0.0;
-int EV::evChargeCount = 0;
 
 void EV::stopCharging(double remainingCharge) {      // state change triggered by drone or ev leaving
 
@@ -166,12 +181,14 @@ void EV::update() {
                     Vehicle::setColor(myID, myColour);
                     myDrone = nullptr;
                     myChargeCount++;
+                    break;
                 }
-                break;
             }
-            myCapacity += upd.second;
-            Vehicle::setParameter(myID, "device.battery.actualBatteryCapacity", to_string(myCapacity));
-            myChargeSteps++;
+            else {
+                myCapacity += upd.second;
+                Vehicle::setParameter(myID, "device.battery.actualBatteryCapacity", to_string(myCapacity));
+                myChargeSteps++;
+            }
         }
         break;
 

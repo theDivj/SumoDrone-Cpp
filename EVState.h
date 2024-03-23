@@ -10,4 +10,4 @@ enum class EVState {
     LEFTSIMULATION,
     NULLSTATE
 };
-
+std::ostream& operator<<(std::ostream& os, EVState const& es);

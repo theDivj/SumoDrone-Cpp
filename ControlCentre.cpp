@@ -344,6 +344,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
     auto libsumoVersion = libsumo::Simulation::getVersion();
 
     // all done, dump the distance travelled by the drones and KW used
+    cerr << "\n" << endl;      // new lines after the ...
     if (brief) {
         string sumoVersion = "(" +  libsumoVersion.first  + std::string(", ") + libsumoVersion.second + ")";
 
@@ -378,7 +379,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
 
     }
     else {
-        string flags("\n\tModel flags:\tRendezvous: ");
+        string flags("\tModel flags:\tRendezvous: ");
         if (GlobalFlags::myModelRendezvous)
             flags += "True\tCharge Once: ";
         else
