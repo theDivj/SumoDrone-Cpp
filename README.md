@@ -1,7 +1,7 @@
 # Using sumo POIs to represent 'Drones' for charging EVs
 >  (Traci scripts for any SUMO model using charging stations and EVs.)      cf <https://github.com/eclipse-sumo/sumo>
 
->   a Python version of this code, using traci, is available as SumoDrone                                    
+>   a Python version of this code, using traci, is available as [ SumoDrone  ](https://github.com/theDivj/sumoDrone)  This also contains a 'demo' simulation.                            
 ---
  This software layers on top of a SUMO model using libsumo/libtraci to model the use of Drones in recharging vehicles. Drones are dispatched from charging stations and return there to recharge. POIs are used to represent drones in sumo-gui. Both Drones and Vehicles turn red when their charge threshold is reached and green whilst recharging. The assumption is that the Drone travels coupled with the vehicle when recharging and only ‘flies’ between charging stations and vehicles/between vehicles.
  
