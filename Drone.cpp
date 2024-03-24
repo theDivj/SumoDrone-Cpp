@@ -86,7 +86,7 @@ void Drone::setDroneType(std::string droneType="ehang184") {  // Support differe
     if (droneType == "ehang184x") {  // ehang 184 with artificially increased battery sizes so they don't need recharging
         d0Type->droneChargeWh = 3000000.0;    // 100 * actual
         d0Type->droneFlyingWh = 14400000.0;
-        d0Type->droneFlyingWhperTimeStep = d0Type->droneFlyingWh / (23 * 60.);
+        d0Type->droneFlyingWhperTimeStep = 14400.0 / (23 * 60.);
         d0Type->droneChargeContingencyp = 0.05;              // minimum contingency level %
         d0Type->droneChargeViablep = 0.3;                    // minimum viable level %
         d0Type->WhEVChargeRatePerTimeStep = 25000 / 3600.;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
@@ -263,14 +263,18 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
     if (GlobalFlags::ss->useChargeHubs and myDummyEVInserted) {
         string dummyFB = myID + "-FB";
         try {
-            Vehicle::resume(dummyFB);
+            int stState = Vehicle::getStopState(dummyFB);  // only need to resume if we actually parked
+            if (stState && 2 == 2)
+                Vehicle::resume(dummyFB);
         }
         catch (const std::exception& err) {}
         Vehicle::remove(dummyFB);
         
         string dummyCB = myID + "-CB";
         try {
-            Vehicle::resume(dummyCB);
+            int stState = Vehicle::getStopState(dummyCB);
+            if (stState && 2 == 2)
+                Vehicle::resume(dummyCB);
         }
         catch (const std::exception& err) {}
         Vehicle::remove(dummyCB);
