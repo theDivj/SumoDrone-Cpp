@@ -375,7 +375,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         if (GlobalFlags::myModelRendezvous)
             cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring  << "\t" << version << "\t" << sumoVersion << endl;
         else
-            cout << "\t\t\t\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
+            cout << "\t\t\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
 
     }
     else {

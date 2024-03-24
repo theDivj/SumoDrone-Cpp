@@ -41,7 +41,7 @@ bool dSimulation::dStep() {        //Simulation step
         }
 
         if (Simulation::getLoadedNumber() > 0) {
-            vector <string> loadedVehicles = Simulation::getLoadedIDList();     // add new EVs to our management list upto the maximum allowed
+            auto loadedVehicles = Simulation::getLoadedIDList();     // add new EVs to our management list upto the maximum allowed
             for (const auto& vehID : loadedVehicles) {
                 if (Vehicle::getParameter(vehID, "has.battery.device") == "true") // we are only interested in EVs
                     if (dSimulation::EVs.size() < dSimulation::maxEVs) {
@@ -49,6 +49,16 @@ bool dSimulation::dStep() {        //Simulation step
                     }
             }
         }
+        /*
+        auto tlist = Simulation::getStartingTeleportIDList();
+        if (tlist.size() > 0) {
+            for (const auto& tport : tlist) {
+                if (tport.find("-CB") != string::npos or tport.find("-FB") != string::npos) {
+                    cerr << "tported: " << tport << endl;
+                    tports.insert(tport);
+                    }
+                }
+        }*/
 
         if (Simulation::getArrivedNumber() > 0) {             // handle vehicles that have left the simulation
             vector <string> arrivedVehicles = Simulation::getArrivedIDList();
@@ -60,12 +70,7 @@ bool dSimulation::dStep() {        //Simulation step
                 }
             }
         }
-       /* auto tlist = Simulation::getStartingTeleportIDList();
-        if (tlist.size() > 0) {
-            for (auto str : tlist)
-                cerr << timeStep << "\t"<< str << "\t";
-            cerr << endl;
-        }*/
+
 
         for (auto& vehID : dSimulation::EVs) { // run the update(state machine) for each EV  we are managing
             vehID.second->update();

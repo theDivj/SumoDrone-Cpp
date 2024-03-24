@@ -45,7 +45,7 @@ EV::EV(const std::string& evID, double kmPerWh) {
     myChargeNeededThreshold = EV::chargeNeededThreshold;
     myevChargeRequestWh = EV::evChargeRequestWh;
  
-    //setEVOverrides(myID);
+    setEVOverrides(myID);
 
     if (GlobalFlags::usingRandom()) {
         double variation = pRandomVariation * myevChargeRequestWh;

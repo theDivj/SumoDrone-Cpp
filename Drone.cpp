@@ -264,17 +264,17 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
         string dummyFB = myID + "-FB";
         try {
             Vehicle::resume(dummyFB);
-            Vehicle::remove(dummyFB);
         }
-        catch (const std::exception& err) { cerr << "hiding -" + dummyFB << err.what() << endl; }   
+        catch (const std::exception& err) {}
+        Vehicle::remove(dummyFB);
         
         string dummyCB = myID + "-CB";
         try {
             Vehicle::resume(dummyCB);
-            Vehicle::remove(dummyCB);
         }
-        catch (const std::exception& err) { cerr << "hiding -" + dummyCB << err.what() << endl; }
-
+        catch (const std::exception& err) {}
+        Vehicle::remove(dummyCB);
+ 
         myDummyEVInserted = false;
     }
 }
@@ -283,17 +283,15 @@ void Drone::dummyEVInsert() {  // If we are generating charge station output add
     if (GlobalFlags::ss->useChargeHubs) {
         string parkLane = myParkEP.edge + "_0";
         string dummyFB = myID + "-FB";
-        Vehicle::add(dummyFB, myParkEP.edge, "Drone");
+        Vehicle::add(dummyFB, myParkEP.edge, "Drone", "now", "0", to_string(myParkEP.epos));
         Vehicle::setParameter(dummyFB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneFlyingWh));
         Vehicle::setParameter(dummyFB, "device.battery.actualBatteryCapacity", to_string(myFlyingCharge));
-        Vehicle::moveTo(dummyFB, parkLane, myParkEP.epos);
         Vehicle::setStop(dummyFB, myParkEP.edge, myParkEP.epos, 0, 10000.0, 1);
         
         string dummyCB = myID + "-CB";
-        Vehicle::add(dummyCB, myParkEP.edge, "Drone");
+        Vehicle::add(dummyCB, myParkEP.edge, "Drone", "now", "0", to_string(myParkEP.epos + 0.5));
         Vehicle::setParameter(dummyCB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneChargeWh));
         Vehicle::setParameter(dummyCB, "device.battery.actualBatteryCapacity", to_string(myCharge));
-        Vehicle::moveTo(dummyCB, parkLane, myParkEP.epos + 0.5);
         Vehicle::setStop(dummyCB, myParkEP.edge, myParkEP.epos + 0.5, 0, 10000.0, 1);
         myDummyEVInserted = true;
     }
