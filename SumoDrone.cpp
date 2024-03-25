@@ -33,7 +33,7 @@ SumoDrone::~SumoDrone() {
 
 GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
 
-    argparse::ArgumentParser program(argv[0], "v3.1");
+    argparse::ArgumentParser program(argv[0], "v3.3");
     // set up the expected runstring
     program.add_argument("sumocfg")               // mandatory
         .help("sumo configuration file");
@@ -166,21 +166,14 @@ void SumoDrone::loop() const {
 }
 
 int main(int argc, char* argv[]) {
-/*
-    Simulation::start({ "sumo", "-c", "E:/SUMODrone/demo/demo.sumocfg" });
-    for (int i = 0; i < 5000; i++) {
-        Simulation::step();
-        std::cout << "step" << std::endl;
-    }
-    Simulation::close();
-  */  
+ 
     SumoDrone* session = new SumoDrone;
     string runstring;
     for (int i = 0; i < argc; i++)
        runstring += std::string(" ") + std::string(argv[i]);
 
     session->runstring = runstring;
-    session->version = "v3.3 20th March 2024";
+    session->version = "v3.3 25th March 2024";
 
     GlobalFlags* gg = session->parseRunstring(argc, argv);
 
@@ -191,23 +184,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-//using namespace libsumo;
-
-/* int main(int argc, char* argv[]) {
-    Simulation::start({ "sumo", "-c", "E:/SUMODrone/demo/demo.sumocfg" });
-    for (int i = 0; i < 5; i++) {
-        Simulation::step();
-    }
-    Simulation::close();
-    */
-
-    // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-    // Debug program: F5 or Debug > Start Debugging menu
-
-    // Tips for Getting Started: 
-    //   1. Use the Solution Explorer window to add/manage files
-    //   2. Use the Team Explorer window to connect to source control
-    //   3. Use the Output window to see build output and other messages
-    //   4. Use the Error List window to view errors
-    //   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-    //   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
