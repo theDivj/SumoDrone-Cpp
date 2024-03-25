@@ -27,6 +27,7 @@ SumoDrone::SumoDrone() {
 }
 
 SumoDrone::~SumoDrone() {
+    gg->cc->tidyDrones();
     gg->cc->printDroneStatistics(briefStatistics, this -> version, this->runstring);
 }
 

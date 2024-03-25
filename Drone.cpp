@@ -218,7 +218,6 @@ bool Drone::allocate(EV* ev, double requestedCharge) { // allocate this instance
     }
 
     myEV = ev;
-    TraCIPosition evpos = ev->getMyPosition();
     myRequestedCharge = requestedCharge;
     POI::setParameter(myID, "status", "allocated to " + ev->getID());
     if (GlobalFlags::myModelRendezvous)
@@ -269,6 +268,7 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
         }
         catch (const std::exception& err) {}
         Vehicle::remove(dummyFB);
+        GlobalFlags::cc->insertedDummies -= 1;
         
         string dummyCB = myID + "-CB";
         try {
@@ -278,6 +278,7 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
         }
         catch (const std::exception& err) {}
         Vehicle::remove(dummyCB);
+        GlobalFlags::cc->insertedDummies -= 1;
  
         myDummyEVInserted = false;
     }
@@ -285,18 +286,20 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
     
 void Drone::dummyEVInsert() {  // If we are generating charge station output add dummy EVs to the charge station for the drone batteries - whilst the drone is there"""
     if (GlobalFlags::ss->useChargeHubs) {
-        string parkLane = myParkEP.edge + "_0";
         string dummyFB = myID + "-FB";
         Vehicle::add(dummyFB, myParkEP.edge, "Drone", "now", "0", to_string(myParkEP.epos));
         Vehicle::setParameter(dummyFB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneFlyingWh));
         Vehicle::setParameter(dummyFB, "device.battery.actualBatteryCapacity", to_string(myFlyingCharge));
         Vehicle::setStop(dummyFB, myParkEP.edge, myParkEP.epos, 0, 10000.0, 1);
-        
+        GlobalFlags::cc->insertedDummies += 1;
+
         string dummyCB = myID + "-CB";
         Vehicle::add(dummyCB, myParkEP.edge, "Drone", "now", "0", to_string(myParkEP.epos + 0.5));
         Vehicle::setParameter(dummyCB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneChargeWh));
         Vehicle::setParameter(dummyCB, "device.battery.actualBatteryCapacity", to_string(myCharge));
         Vehicle::setStop(dummyCB, myParkEP.edge, myParkEP.epos + 0.5, 0, 10000.0, 1);
+        GlobalFlags::cc->insertedDummies += 1;
+
         myDummyEVInserted = true;
     }
 }
@@ -387,6 +390,7 @@ void Drone::notifyEVFinished(EVState evState) { // EV tells us that it is charge
         myBrokenEVCharges += 1;
         setMyParkPosition();
         if (myState == DroneState::CHARGINGDRONE or myState == DroneState::PARKED) {
+            dummyEVHide();
             myEV = nullptr;
         }
         else

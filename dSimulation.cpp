@@ -26,7 +26,7 @@ dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
 }
 
 bool dSimulation::dStep() {        //Simulation step
-    if (Simulation::getMinExpectedNumber() > 0) {
+    if (Simulation::getMinExpectedNumber() > GlobalFlags::cc->insertedDummies) {
         Simulation::executeMove();                     //  move vehicles first so we can move drones to the same position
         dSimulation::timeStep += 1;
 

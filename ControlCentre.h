@@ -35,6 +35,7 @@ public:
     static inline std::unordered_set<Drone*> needChargeDrones;
     static inline int spawnedDrones;
 
+    int insertedDummies;
 
     ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones);
 
@@ -68,6 +69,8 @@ public:
     void syncSpawnedDrones() { // if we'd generated drones from POI we need to update our spawnedDrone count
         spawnedDrones = Drone::getIDCount();
     }
+
+    void tidyDrones();
 
     void update();
 };

@@ -28,6 +28,7 @@ ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximit
     proximityRadius = pproximityRadius;
     maxDrones = pmaxDrones;
     spawnedDrones = 0;
+    insertedDummies = 0;
 }
 
 void ControlCentre::allocate(Drone* drone,  EV* ev) {
@@ -427,6 +428,18 @@ void ControlCentre::requestCharge(EV* ev, double capacity, double requestedWh = 
     if (GlobalFlags::myChargePrint)
         GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requestedWh << endl;
  }
+
+void ControlCentre::tidyDrones() {
+    if (insertedDummies > 0) {
+        set<Drone*, decltype(droneCmp)*> dummyDrones(droneCmp);
+        merge(freeDrones.begin(), freeDrones.end(), needChargeDrones.begin(), needChargeDrones.end(),
+            inserter(dummyDrones, dummyDrones.begin()));
+
+        for (auto drone : dummyDrones)
+            if (drone->myDummyEVInserted)
+                drone->dummyEVHide();
+    }
+}
 
 void ControlCentre::update() { //Management of 'control centre' executed by simulation on every step
     size_t availableDrones = freeDrones.size() + maxDrones - spawnedDrones;
