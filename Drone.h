@@ -1,6 +1,7 @@
 #pragma once
 #include <libsumo/libsumo.h>
 #include <string>
+
 #include "ChargeHubs.h"
 #include "DroneState.h"
 #include "EVState.h"
@@ -8,29 +9,32 @@
 
 class EV;
 
-
 class Drone
 {
-public:
 
+public:
     static int droneIDCount;
+    static DroneType* d0Type;
+
+private:
     static bool parkAtHome;                          
 
     static bool dummyEVCreated;       // whether we have created the dummy ev vehicle type, used to get charging station output
  
     static bool printedType;
-    static DroneType* d0Type;
 
-    DroneType* myDt;
     std::string myID;
     libsumo::TraCIPosition myPosition;
     libsumo::TraCIPosition myParkPosition;
     hubLocation myParkEP;
-    double myCharge;
-    double myFlyingCharge;
     bool myViableCharge;
     DroneState myState;
     EV* myEV;
+
+public:
+    DroneType* myDt;
+    double myCharge;
+    double myFlyingCharge;
 
     // logging
     int myFlyingCount;              // used to compute distance travelled
@@ -45,14 +49,16 @@ public:
     int myChaseSteps;               // count of steps in all complete chases - used with myChaseCount to compute average
     double myRequestedCharge;       // the amount of charge requested by the EV
     bool myDummyEVInserted;         // whether the dummy EVs have been inserted
-   
+ 
+public:
     Drone(libsumo::TraCIPosition pos, std::string ID = "", DroneType* DT = nullptr);
 
     Drone() = default;
-    
+
     static int getIDCount() {
         return droneIDCount;
     }
+
     static void setDroneType(std::string droneType);
 
     static int setDroneTypeFromPOI(bool zeroDrone);   // returns how many drones were created                                       
@@ -81,7 +87,7 @@ public:
 
     libsumo::TraCIPosition getMyPosition() const { return myPosition; }
 
-    void logLine(std::string activity);
+    void logLine(std::string activity) const;
                                                    
     void notifyChase(bool chaseOK, int chaseSteps);
 
@@ -99,5 +105,5 @@ public:
 
     bool usePower(std::string mode);
 
-    bool viable();
+    bool viable() const;
 };

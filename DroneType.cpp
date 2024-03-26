@@ -66,5 +66,5 @@ std::ostream& operator<<(std::ostream& os, DroneType const& dt) {
     os << "minDroneFlyingWh\t" << dt.minDroneFlyingWh << "\n";
     os << "viableDroneCharge\t" << dt.viableDroneCharge << "\n";       // thresholds to allow allocation - ie enough charge to be useful
     os << "viableDroneFlyingWh\t" << dt.viableDroneFlyingWh << "\n";
-
+    return os;
 }

@@ -12,30 +12,34 @@
 
 #include "GlobalFlags.h"
 #include "EVState.h"
-
-class urgency;
-class Drone;
-
 #include "urgency.h"
+
+class Drone;
 
 class ControlCentre
 {
-public:
+    friend class urgency;
+
+protected:
     static inline double wEnergy;
     static inline double wUrgency;
     static inline double proximityRadius;
+
+private:
     static inline int maxDrones;
     static inline bool zeroDrone;
 
+private:
     static inline std::unordered_map< EV*, double> requests;
     static inline std::unordered_map< EV*, Drone*> allocatedEV;
     static inline std::unordered_map< EV*, double> startChargeEV;
     static inline std::unordered_map<Drone*,  EV*> allocatedDrone;
-    static inline std::unordered_set<Drone*> freeDrones;
     static inline std::unordered_set<Drone*> needChargeDrones;
     static inline int spawnedDrones;
 
+public:
     int insertedDummies;
+    static inline std::unordered_set<Drone*> freeDrones;
 
     ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones);
 

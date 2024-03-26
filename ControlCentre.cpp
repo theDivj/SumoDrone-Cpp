@@ -46,29 +46,29 @@ void ControlCentre::allocate(Drone* drone,  EV* ev) {
 
 
 void ControlCentre::allocateDrones() {
-    std::set<urgency, decltype(urgencyCmp)* > urgencyList = urgency::calcUrgency();
+    std::set<urgency*, decltype(urgencyCmp)* > urgencyList = urgency::calcUrgency();
 
     size_t ld = freeDrones.size();                                    // available loaded drones
     int nd = ControlCentre::maxDrones - ControlCentre::spawnedDrones; // available new drones
     if (ld == 1)
         for (const auto& pr : urgencyList) {
             auto droneIt = freeDrones.begin();
-            allocate(*droneIt, pr.ev);
+            allocate(*droneIt, pr->ev);
             freeDrones.erase(*droneIt);
             break;
         }
     else if (ld < 1 && nd > 0)
         for (const auto& pr : urgencyList) {
-            auto hub = GlobalFlags::ch->nearestHubLocation(pr.ev->getMyPosition());
+            auto hub = GlobalFlags::ch->nearestHubLocation(pr->ev->getMyPosition());
             Drone* drone = new Drone(hub.first.xypos);
             spawnedDrones += 1;
-            allocate(drone, pr.ev);
+            allocate(drone, pr->ev);
             if ((nd -= 1) <= 0)
                 break;
         }
     else if (ld > 1)
         for (const auto& pr : urgencyList) { // need to find drone nearest the ev before we allocate
-            TraCIPosition evPos = pr.ev->getMyPosition();
+            TraCIPosition evPos = pr->ev->getMyPosition();
             double evDistance = numeric_limits<int>::max();
             Drone* nearestDrone = nullptr;
             for (auto& drone : freeDrones) {
@@ -84,16 +84,16 @@ void ControlCentre::allocateDrones() {
                 }
             }
             if (nearestDrone) {
-                allocate(nearestDrone, pr.ev);
+                allocate(nearestDrone, pr->ev);
                 freeDrones.erase(nearestDrone);
             }
             else if (nd > 0)   // no free drones so spawn another
                 for (const auto& pr : urgencyList) {
-                    TraCIPosition evPos = pr.ev->getMyPosition();
+                    TraCIPosition evPos = pr->ev->getMyPosition();
                     pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
                     Drone* drone = new Drone(hub.first.xypos);
                     ControlCentre::spawnedDrones += 1;
-                    allocate(drone, pr.ev);
+                    allocate(drone, pr->ev);
                     nd -= 1;
                     if (nd <= 0)
                         break;
@@ -101,16 +101,19 @@ void ControlCentre::allocateDrones() {
         }
     else  //   # ld == 0 nd > 0
         for (const auto& pr : urgencyList) {
-            TraCIPosition evPos = pr.ev->getMyPosition();
+            TraCIPosition evPos = pr->ev->getMyPosition();
             pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
             Drone* drone = new Drone(hub.first.xypos);
             ControlCentre::spawnedDrones += 1;
-            allocate(drone, pr.ev);
+            allocate(drone, pr->ev);
             nd -= 1;
             if (nd <= 0)
                 break;
         }
-}
+
+    for (const auto& pr : urgencyList) { delete(pr); }
+    
+ }
 
 
 
@@ -195,7 +198,7 @@ TraCIPosition ControlCentre::findRendezvousXY( EV* ev, Drone* drone) {
         if (get<2>(edgePos)) {      // will normally only fail if drone cannot reach EV under straight line intercept assumptions
             posRV = Simulation::convert2D(get<0>(edgePos), get<1>(edgePos));  // get the x, y position after evCrowFlies metres
             // Algorithm debug lines - show rendezvous point
-            //string pid =  ev->getID() + " " + std::to_string(GlobalFlags::ss->timeStep);
+            //string pid =  ev->getID() + " " + std::to_string(GlobalFlags::ss->getTimeStep());
             //POI::add(pid, posRV.x, posRV.y, { 255, 0, 255, 250 },"",0, "drone.png", 5.0, 5.0);
         }
         return posRV;   //this falls back to the original crow flies when straight line intercept fails
@@ -223,7 +226,7 @@ void ControlCentre::notifyEVState(EV* ev, EVState evState, Drone* drone, double 
     case EVState::DRIVING:            // means charge complete  so calculate charge
     case EVState::CHARGEBROKENOFF:    // drone broke off charge so should have an entry in self.startChargeEV
         if (startChargeEV.find(ev) != startChargeEV.end()) {
-            charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
+            charge = (GlobalFlags::ss->getTimeStep() - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
             startChargeEV.erase(ev);
         }
         break;
@@ -232,13 +235,15 @@ void ControlCentre::notifyEVState(EV* ev, EVState evState, Drone* drone, double 
         break;
 
     case EVState::CHARGINGFROMDRONE:      // charge started
-        startChargeEV[ev] = GlobalFlags::ss->timeStep;
+        startChargeEV[ev] = GlobalFlags::ss->getTimeStep();
         break;
 
     case EVState::LEFTSIMULATION:
         if (startChargeEV.find(ev) != startChargeEV.end()) {
-            if (startChargeEV[ev] > 0)
-                charge = (GlobalFlags::ss->timeStep - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
+            if (startChargeEV[ev] > 0) {
+                charge = (GlobalFlags::ss->getTimeStep() - startChargeEV[ev]) * drone->myDt->WhEVChargeRatePerTimeStep;
+                startChargeEV.erase(ev);
+            }
         }
         if (requests.find(ev) != requests.end()) {
             requests.erase(ev);
@@ -260,7 +265,8 @@ void ControlCentre::notifyEVState(EV* ev, EVState evState, Drone* drone, double 
         string droneID = "-";
         if (drone != nullptr)
             droneID = drone->getID();
-        GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" << ev->getID() << "\t" << evState << "\t" << droneID << "\t" << capacity << "\t" << charge << endl;
+        double ts = GlobalFlags::ss->getTimeStep();
+        GlobalFlags::myChargeLog << ts << "\t" << ev->getID() << "\t" << evState << "\t" << droneID << "\t" << capacity << "\t" << charge << endl;
     }
 }
 
@@ -334,7 +340,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         // note chases + broken chases usually less than charge sessions total because some will break off before they get to rendezvous
         // ie chases are between rendezvous point and beginning charging - indicator of efficiency of rendezvous algorithm
         if (tmyChaseCount > 0)
-            averageChase = (tmyChaseSteps * GlobalFlags::ss->stepSecs) / tmyChaseCount;
+            averageChase = (tmyChaseSteps * GlobalFlags::ss->getStepSecs()) / tmyChaseCount;
     }
     auto now = chrono::system_clock::now();
     auto itt = std::chrono::system_clock::to_time_t(now);
@@ -368,7 +374,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
             flags += "False\t";
         cout << std::fixed << std::setprecision(2);
 
-        cout << flags << wEnergy << "\t" << wUrgency << "\t" << proximityRadius << "\t" << GlobalFlags::ss->timeStep << "\t"
+        cout << flags << wEnergy << "\t" << wUrgency << "\t" << proximityRadius << "\t" << GlobalFlags::ss->getTimeStep() << "\t"
             << spawnedDrones << "\t" << tDroneDistance << "\t" << tmyFlyingKWh << "\t" << tmyChargingKWh << "\t"
             << tmyChargeMeFlyingKWh << "\t" << tmyChargeMeKWh << "\t" << tmyResidualFlyingKWh << "\t" << tmyResidualChargeKWh << "\t"
             << EV::evCount << "\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
@@ -397,7 +403,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         cout << std::fixed << std::setprecision(1);
         cout << "\nSummary Statistics:\t\t" << timeStamp << flags;
         cout << "\tEnergy Weight: " << wEnergy << "\tUrgency Weight: " << wUrgency;
-        cout << "\tProximity radius(m): " << proximityRadius << "\tTime steps : " << GlobalFlags::ss->timeStep << endl;
+        cout << "\tProximity radius(m): " << proximityRadius << "\tTime steps : " << GlobalFlags::ss->getTimeStep() << endl;
         cout << "\n\tDrone Totals: (" << spawnedDrones << ")" << endl;
         cout <<  std::setprecision(2);
         cout << "\t\tDistance Km: \t" << tDroneDistance << "\n\t\tFlying KWh: \t" << tmyFlyingKWh << "\n\t\tCharging KWh: \t" << tmyChargingKWh << endl;
@@ -426,7 +432,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
 void ControlCentre::requestCharge(EV* ev, double capacity, double requestedWh = 2000.0) {
     requests[ev] = requestedWh;
     if (GlobalFlags::myChargePrint)
-        GlobalFlags::myChargeLog << GlobalFlags::ss->timeStep << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requestedWh << endl;
+        GlobalFlags::myChargeLog << GlobalFlags::ss->getTimeStep() << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requestedWh << endl;
  }
 
 void ControlCentre::tidyDrones() {

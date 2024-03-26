@@ -2,30 +2,30 @@
 #include <libsumo/libsumo.h>
 #include "urgency.h"
 #include "ControlCentre.h"
+
 using namespace std;
 using namespace libsumo;
 
-bool urgencyCmp(const urgency& lurg, const urgency& rurg)
-{
-    return lurg.urg < rurg.urg;
-}
+bool urgencyCmp(const urgency* lurg, const urgency* rurg){
+    return lurg->urg < rurg->urg;
+};
 
-void urgencyListOut(string txt, std::set <urgency, decltype(urgencyCmp)* >& uList) {
+void urgencyListOut(string txt, std::set <urgency*, decltype(urgencyCmp)* >& uList) {
     cout << txt << "\n";
-    for (auto& urg : uList) {
-        cout << "\t" << urg <<"\n";
+    for (auto& urgnc : uList) {
+        cout << "\t" << urgnc->urg <<"\n";
     }
     cout << endl;
 }
 /* urgency defined as distance to nearest hub / distance ev can travel on charge.
         creates a list of ev's that want charge, have not been allocated a drone
         */
-std::set<urgency, decltype(urgencyCmp)* > urgency::calcUrgency() {
-    std::set <urgency, decltype(urgencyCmp)* > urgencyList(urgencyCmp);
+std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
+    std::set <urgency*, decltype(urgencyCmp)* > urgencyList(urgencyCmp);
     if (ControlCentre::requests.size() == 1)
         for (auto ev : ControlCentre::requests)
         {
-            auto ret = urgencyList.insert(urgency(1.0, ev.first, ev.second));
+            auto ret = urgencyList.insert(new urgency(1.0, ev.first, ev.second));
         }
     else {
         bool firstCall = true;
@@ -81,7 +81,7 @@ std::set<urgency, decltype(urgencyCmp)* > urgency::calcUrgency() {
                 urgencyv = hDist.second / evRange;
 
             double CEC = (proximity * ControlCentre::wEnergy) + (urgencyv * ControlCentre::wUrgency);
-            auto ret = urgencyList.insert(urgency(CEC, ev.first, ev.second));
+            auto ret = urgencyList.insert(new urgency(CEC, ev.first, ev.second));
         }
     }
     //urgencyListOut("", urgencyList);
@@ -118,6 +118,6 @@ std::pair<std::unordered_set<EV*>, double> urgency::getNeighboursNeedingCharge(E
     return pair<unordered_set<EV*>, double> {neighbours, meanDist};
 }
 
-std::ostream& operator<<(std::ostream& os, urgency const& urgent) {
-    os << urgent.urg << "\t" << urgent.ev->getID() << "\t" << urgent.requestedCharge; return os;
+std::ostream& urgency::operator<<(std::ostream& os) {
+    os << urg << "\t" << ev->getID() << "\t" << requestedCharge; return os;
 }

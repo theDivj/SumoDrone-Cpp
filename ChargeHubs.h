@@ -16,9 +16,10 @@ struct hubLocation {
 
 class ChargeHubs
 {
-public:
+
     std::unordered_map<std::string, hubLocation> chargeHubLocations;
 
+public:
     ChargeHubs() { locateChargeHubs(); }
 
     std::pair<hubLocation, double> findNearestHub(libsumo::TraCIPosition pxy);

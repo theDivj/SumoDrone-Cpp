@@ -33,7 +33,7 @@ Drone::Drone(TraCIPosition pos, string poi, DroneType* DT) {
     }
 
     myDt->droneKMperh = GlobalFlags::myDroneKmPerHr;
-    myDt->setDerived(GlobalFlags::ss->stepSecs);
+    myDt->setDerived(GlobalFlags::ss->getStepSecs());
 
     myPosition = pos;
     myParkPosition = myPosition;
@@ -67,7 +67,7 @@ Drone::Drone(TraCIPosition pos, string poi, DroneType* DT) {
         POI::setHeight(myID, myDt->droneHeight);
     }
 
-    if (GlobalFlags::ss->useChargeHubs and not dummyEVCreated)  
+    if (GlobalFlags::ss->getUseChargeHubs() and not dummyEVCreated)  
         createDummyEV();
     //if (not Drone::printedType) {
      //   cerr << *myDt << endl;
@@ -259,7 +259,7 @@ void Drone::createDummyEV() {  // Create an EV type to use at charging stations 
 }
 
 void Drone::dummyEVHide() {  // remove the dummy EVs""";
-    if (GlobalFlags::ss->useChargeHubs and myDummyEVInserted) {
+    if (GlobalFlags::ss->getUseChargeHubs() and myDummyEVInserted) {
         string dummyFB = myID + "-FB";
         try {
             int stState = Vehicle::getStopState(dummyFB);  // only need to resume if we actually parked
@@ -285,7 +285,7 @@ void Drone::dummyEVHide() {  // remove the dummy EVs""";
 }
     
 void Drone::dummyEVInsert() {  // If we are generating charge station output add dummy EVs to the charge station for the drone batteries - whilst the drone is there"""
-    if (GlobalFlags::ss->useChargeHubs) {
+    if (GlobalFlags::ss->getUseChargeHubs()) {
         string dummyFB = myID + "-FB";
         Vehicle::add(dummyFB, myParkEP.edge, "Drone", "now", "0", to_string(myParkEP.epos));
         Vehicle::setParameter(dummyFB, "device.battery.maximumBatteryCapacity", to_string(myDt->droneFlyingWh));
@@ -361,7 +361,7 @@ bool Drone::fly(libsumo::TraCIPosition pos) {
         return false;                    //we haven't got anywhere yet!
 }
 
-void Drone::logLine(std::string activity) { // Output discrete changes in charge levels for this drone"""
+void Drone::logLine(std::string activity) const { // Output discrete changes in charge levels for this drone"""
     string evID = "";
     string lane = "";
     double lanePos = 0;
@@ -370,7 +370,7 @@ void Drone::logLine(std::string activity) { // Output discrete changes in charge
         lane = Vehicle::getLaneID(evID);
         lanePos = Vehicle::getLanePosition(evID);
     }
-    GlobalFlags::myDroneLog << setprecision(1) << GlobalFlags::ss->timeStep << "\t" << myID << "\t" << evID << "\t";
+    GlobalFlags::myDroneLog << setprecision(1) << GlobalFlags::ss->getTimeStep() << "\t" << myID << "\t" << evID << "\t";
     GlobalFlags::myDroneLog << setprecision(4) << lane + "\t" << lanePos<< "\t" << myPosition.x << "\t" << myPosition.y << "\t";
     GlobalFlags::myDroneLog << setprecision(4) << myEVChargingCount * myDt->WhEVChargeRatePerTimeStep << "\t" << myCharge << "\t" << myFlyingCharge << "\t" + activity << endl;
 }
@@ -620,7 +620,7 @@ bool Drone::usePower(std::string mode) {  // Am flying or charging an EV so adju
     return true;
 }
 
-bool Drone::viable() {   // helper function to check whether we are able to be diverted"""
+bool Drone::viable() const {   // helper function to check whether we are able to be diverted"""
     switch (myState) {
     case DroneState::FLYINGTOCHARGE:
         return false;

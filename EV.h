@@ -7,7 +7,9 @@
 
 class EV
 {
-public:
+    friend class ControlCentre;
+
+protected:
     static double chargeNeededThreshold;
     static double chargeDoneThreshold;
     static double evChargeRequestWh;
@@ -18,6 +20,7 @@ public:
     static double evChargeGap;
     static int evChargeCount;
 
+private:
     double myKmPerWh;
     std::string myID;
     EVState myState;
@@ -34,9 +37,8 @@ public:
     double myChargeDone;
     double myLastChargeRequest;
 
-    //friend DroneState;
-
-    EV(const std::string& evID, double kmPerWh);
+public:
+    EV(const std::string& evID, double kmPerWh = EV::kmPerWh);
 
     EV() = default;
 
@@ -61,6 +63,10 @@ public:
 
     std::string getID() const {    // getter function for EV identity
         return myID;
+    }
+
+    static double getEVKmPerWh() {  // getter for EV default
+        return EV::kmPerWh;
     }
 
     double getMyKmPerWh() const {  // getter for my average usage

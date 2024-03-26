@@ -7,28 +7,40 @@
 class EV;
 
 class dSimulation {
+
+    int maxEVs;
+    std::unordered_map<std::string,EV*> EVs;
+    bool usingSumogui;
+    bool useChargeHubs;
+    double stepSecs;
+    int timeStep;
+
 public:
-    static inline int maxEVs;
-    static inline double stepSecs;
-    static inline bool useChargeHubs;
-    static inline int timeStep;
-
-    static inline std::unordered_map<std::string,EV*> EVs;
-
-    static inline bool usingSumogui;
-
     dSimulation(const std::vector<std::string> sumoCmd, int maxEVs);
 
     dSimulation() = default;
 
     ~dSimulation() {
         libsumo::Simulation::close();
-        dSimulation::EVs.clear();
+        EVs.clear();
     }
 
-    static bool dStep();
+    bool dStep();
+
+    bool getUseChargeHubs() {
+        return useChargeHubs;
+    }
+
+    double getStepSecs() {
+        return stepSecs;
+    }
+
+    double getTimeStep() {
+        return timeStep;
+    }
 
     void setMaxEvs(int pmaxEvs) {
         maxEVs = pmaxEvs;
     }
+
 };

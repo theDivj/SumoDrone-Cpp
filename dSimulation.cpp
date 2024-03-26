@@ -8,12 +8,19 @@ using namespace std;
 #include "Drone.h"
 #include <iostream>
 
+// initialise class variables
+int maxEVs = numeric_limits<int>::max();
+bool usingSumogui = false;
+bool useChargeHubs = false;
+double stepSecs = 0.0;
+int timeStep    = 0;
+
 dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
     try {
         Simulation::start(sumoCmd);
     } catch (const std::exception& err) { cerr << "start failed: " << err.what() << endl; }
-    dSimulation::stepSecs = Simulation::getDeltaT();
-    dSimulation::maxEVs = pmaxEVs;
+    stepSecs = Simulation::getDeltaT();
+    maxEVs = pmaxEVs;
     if (Simulation::getOption("chargingstations-output").length() > 1)
         useChargeHubs = true;
     else
@@ -28,14 +35,14 @@ dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
 bool dSimulation::dStep() {        //Simulation step
     if (Simulation::getMinExpectedNumber() > GlobalFlags::cc->insertedDummies) {
         Simulation::executeMove();                     //  move vehicles first so we can move drones to the same position
-        dSimulation::timeStep += 1;
+        timeStep += 1;
 
         if (!usingSumogui) {    // let them know we're working
-            int op = int(dSimulation::timeStep / 200) * 200;
-            if (op == dSimulation::timeStep) { 
+            int op = int(timeStep / 200) * 200;
+            if (op == timeStep) { 
                 cerr << ".";
-                op = int(dSimulation::timeStep / 16000) * 16000;   // new line every 80 dots
-                if (op == dSimulation::timeStep)
+                op = int(timeStep / 16000) * 16000;   // new line every 80 dots
+                if (op == timeStep)
                     cerr << endl;
             }
         }
@@ -44,8 +51,8 @@ bool dSimulation::dStep() {        //Simulation step
             auto loadedVehicles = Simulation::getLoadedIDList();     // add new EVs to our management list upto the maximum allowed
             for (const auto& vehID : loadedVehicles) {
                 if (Vehicle::getParameter(vehID, "has.battery.device") == "true") // we are only interested in EVs
-                    if (dSimulation::EVs.size() < dSimulation::maxEVs) {
-                        dSimulation::EVs[vehID] = new EV(vehID, EV::kmPerWh);   // can set kmPerWh here to cater for different EVs - get from an EV parameter ?
+                    if (EVs.size() < maxEVs) {
+                        EVs[vehID] = new EV(vehID);   // can set kmPerWh here to cater for different EVs - get from an EV parameter ?
                     }
             }
         }
@@ -63,16 +70,16 @@ bool dSimulation::dStep() {        //Simulation step
         if (Simulation::getArrivedNumber() > 0) {             // handle vehicles that have left the simulation
             vector <string> arrivedVehicles = Simulation::getArrivedIDList();
             for (const auto& aID : arrivedVehicles) {
-                if (dSimulation::EVs.find(aID) != EVs.end()) {
-                    dSimulation::EVs[aID]->leftSimulation();       // notify EV shadow that the vehicle has left
-                    dSimulation::EVs[aID]->update();               //  run the update as we will be removing this from the management loop
-                    dSimulation::EVs.erase(aID);
+                if (EVs.find(aID) != EVs.end()) {
+                    EVs[aID]->leftSimulation();       // notify EV shadow that the vehicle has left
+                    EVs[aID]->update();               //  run the update as we will be removing this from the management loop
+                    EVs.erase(aID);
                 }
             }
         }
 
 
-        for (auto& vehID : dSimulation::EVs) { // run the update(state machine) for each EV  we are managing
+        for (auto& vehID : EVs) { // run the update(state machine) for each EV  we are managing
             vehID.second->update();
         }
         GlobalFlags::cc->update();           // trigger control centre management on this step               
