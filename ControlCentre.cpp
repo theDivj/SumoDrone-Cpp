@@ -386,7 +386,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
 
     }
     else {
-        string flags("\tModel flags:\tRendezvous: ");
+        string flags("\n\tModel flags:\tRendezvous: ");
         if (GlobalFlags::myModelRendezvous)
             flags += "True\tCharge Once: ";
         else

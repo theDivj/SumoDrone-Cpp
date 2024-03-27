@@ -50,7 +50,6 @@ public:
     double myRequestedCharge;       // the amount of charge requested by the EV
     bool myDummyEVInserted;         // whether the dummy EVs have been inserted
  
-public:
     Drone(libsumo::TraCIPosition pos, std::string ID = "", DroneType* DT = nullptr);
 
     Drone() = default;

@@ -9,7 +9,7 @@
 #include "Drone.h"
 #include "GlobalFlags.h"
 #include "dSimulation.h"
-
+#include "version.h"
 
 using namespace libsumo;
 using namespace std;
@@ -28,7 +28,7 @@ SumoDrone::SumoDrone() {
 
 SumoDrone::~SumoDrone() {
     gg->cc->tidyDrones();
-    gg->cc->printDroneStatistics(briefStatistics, this -> version, this->runstring);
+    gg->cc->printDroneStatistics(briefStatistics, __version__, this->runstring);
 }
 
 GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
@@ -173,7 +173,6 @@ int main(int argc, char* argv[]) {
        runstring += std::string(" ") + std::string(argv[i]);
 
     session->runstring = runstring;
-    session->version = "v3.3 25th March 2024";
 
     GlobalFlags* gg = session->parseRunstring(argc, argv);
 

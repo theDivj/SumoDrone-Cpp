@@ -28,8 +28,6 @@ protected:
 private:
     static inline int maxDrones;
     static inline bool zeroDrone;
-
-private:
     static inline std::unordered_map< EV*, double> requests;
     static inline std::unordered_map< EV*, Drone*> allocatedEV;
     static inline std::unordered_map< EV*, double> startChargeEV;
@@ -39,6 +37,7 @@ private:
 
 public:
     int insertedDummies;
+
     static inline std::unordered_set<Drone*> freeDrones;
 
     ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones);

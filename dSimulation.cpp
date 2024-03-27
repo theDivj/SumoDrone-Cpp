@@ -8,14 +8,8 @@ using namespace std;
 #include "Drone.h"
 #include <iostream>
 
-// initialise class variables
-int maxEVs = numeric_limits<int>::max();
-bool usingSumogui = false;
-bool useChargeHubs = false;
-double stepSecs = 0.0;
-int timeStep    = 0;
-
 dSimulation::dSimulation(const vector<string> sumoCmd, int pmaxEVs) {
+
     try {
         Simulation::start(sumoCmd);
     } catch (const std::exception& err) { cerr << "start failed: " << err.what() << endl; }

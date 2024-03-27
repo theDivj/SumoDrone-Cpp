@@ -3,17 +3,18 @@
 #include <vector>
 #include <string>
 #include <libsumo/libsumo.h>
+#include <limits>
 
 class EV;
 
 class dSimulation {
 
-    int maxEVs;
+    int maxEVs = std::numeric_limits<int>::max();
     std::unordered_map<std::string,EV*> EVs;
-    bool usingSumogui;
-    bool useChargeHubs;
-    double stepSecs;
-    int timeStep;
+    bool usingSumogui = false;
+    bool useChargeHubs = false;
+    double stepSecs = 1.0;
+    int timeStep = 0;
 
 public:
     dSimulation(const std::vector<std::string> sumoCmd, int maxEVs);

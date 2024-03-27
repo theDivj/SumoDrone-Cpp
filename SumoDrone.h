@@ -19,7 +19,6 @@ public:
     int maxEVs;             // = numeric_limits<int>::max();
     std::string sumoCmd;
     std::string runstring;
-    std::string version;
     
     GlobalFlags* gg;
 
