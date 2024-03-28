@@ -39,7 +39,15 @@ void ChargeHubs::locateChargeHubs() {
         string edge = lane.substr(0, lane.find("_"));
         double pos = ChargingStation::getStartPos(hub) + 5;
         TraCIPosition pxy = Simulation::convert2D(edge, pos);
-        chargeHubLocations[hub] = hubLocation(hub, pxy, edge, pos);
+
+        double power = 75000;
+        string sPower = ChargingStation::getParameter(hub, "WhPower");
+        if (sPower.length() > 1) { power = stod(sPower); }
+        double efficiency = 1.0;
+        string sEfficiency = ChargingStation::getParameter(hub, "efficiency");
+        if (sEfficiency.length() > 1) { efficiency = stod(sEfficiency); }
+        power = efficiency * power;
+        chargeHubLocations[hub] = hubLocation(hub, pxy, edge, pos, power);
         Route::add(edge, { edge });
     }
 }
