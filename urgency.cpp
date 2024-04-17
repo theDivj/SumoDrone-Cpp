@@ -1,4 +1,5 @@
 #include <string>
+#include <tuple>
 #include <libsumo/libsumo.h>
 #include "urgency.h"
 #include "ControlCentre.h"
@@ -22,6 +23,11 @@ void urgencyListOut(string txt, std::set <urgency*, decltype(urgencyCmp)* >& uLi
         */
 std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
     std::set <urgency*, decltype(urgencyCmp)* > urgencyList(urgencyCmp);
+    std::set <tuple<double,double,EV*,double>*> urgencySet;
+
+    double urgencySum = 0.0;
+    double proximitySum = 0.0;
+
     if (ControlCentre::requests.size() == 1)
         for (auto ev : ControlCentre::requests)
         {
@@ -39,7 +45,8 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
             pair<hubLocation, double> hDist = GlobalFlags::ch->findNearestHub(evPos);
             //# hub, hubDistance = GG.ch.findNearestHubDriving(evID)
 
-            double evRange = 200.0; 
+            double evRange = 10000.0; 
+            double urgencyv = 0.0;
             if (ControlCentre::wUrgency > 0.0) {   // if we have an ugency weight then we need to calculate the range
                 double distance = Vehicle::getDistance(evID);
                 if (distance > 10000) {   // can compute real range after we've been driving for a while - arbitrary 10km
@@ -48,10 +55,13 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
                 }
                 else   // otherwise just a guesstimate
                     evRange = stod(Vehicle::getParameter(evID, "device.battery.actualBatteryCapacity")) * ev.first->getMyKmPerWh();
+
+                urgencyv = hDist.second / evRange;
+                urgencySum += urgencyv;
             }
-            double proximity = 1.0;
-            double urgencyv = 1.0;
-            if (ControlCentre::wEnergy != 0.0) {       // We have a weight so need to calculate proximity
+
+            double proximityv = 0.0;
+            if (ControlCentre::wEnergy > 0.0) {       // We have a weight so need to calculate proximity
                 pair<unordered_set<EV*>, double> neighbours = getNeighboursNeedingCharge(ev.first, firstCall);
                 firstCall = false;
                 // find distance for nearest drone to this eV - usually only one drone so will be the one allocated
@@ -71,20 +81,32 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
                     neighbours.second /= neighbours.first.size();   // set distance  'smaller' the more neighbours there are
                 //delete neighbours
 
-            // add in drone distance - ie smallest proximity will have closest drone
+                // add in drone distance - ie smallest proximity will have closest drone
                 if (hDist.second == numeric_limits<double>::max())
-                    proximity = droneDist + neighbours.second;     //  + evRange
+                    proximityv = droneDist + neighbours.second;     //  + evRange
                 else
-                    proximity = droneDist + neighbours.second;     //   /drivingDistance
+                    proximityv = droneDist + neighbours.second;     //   /drivingDistance
+                proximitySum += proximityv;
             }
-            else
-                urgencyv = hDist.second / evRange;
-
-            double CEC = (proximity * ControlCentre::wEnergy) + (urgencyv * ControlCentre::wUrgency);
-            auto ret = urgencyList.insert(new urgency(CEC, ev.first, ev.second));
+            urgencySet.insert(new tuple(urgencyv, proximityv, ev.first, ev.second));          
         }
-    }
-    //urgencyListOut("", urgencyList);
+            
+        // "Normalize" weights
+        size_t evCount = urgencySet.size();
+        double urgencyWt = 0.0;
+        if (ControlCentre::wUrgency > 0.0)
+            urgencyWt= ControlCentre::wUrgency / (urgencySum / evCount);
+        double proximityWt = 0.0;
+        if (ControlCentre::wEnergy > 0.0)
+            proximityWt= ControlCentre::wEnergy / (proximitySum / evCount);
+
+        for (const auto pr : urgencySet) {
+            double urgencyv = std::get<0>(*pr) * urgencyWt;
+            double proximityv = std::get<1>(*pr) * proximityWt;
+            double CEC = proximityv + urgencyv;
+            auto ret = urgencyList.insert(new urgency(CEC, std::get<2>(*pr), std::get<3>(*pr)));
+            }
+       }
     return urgencyList;
 }
 
