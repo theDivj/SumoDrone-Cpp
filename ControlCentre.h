@@ -34,19 +34,22 @@ private:
     static inline std::unordered_map<Drone*,  EV*> allocatedDrone;
     static inline std::unordered_set<Drone*> needChargeDrones;
     static inline int spawnedDrones;
+    static inline int fullChargeTolerance;
 
 public:
     int insertedDummies;
 
     static inline std::unordered_set<Drone*> freeDrones;
 
-    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones);
+    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones, int fullChargeTolerance);
 
     ControlCentre() = default;
 
     void allocate(Drone* drone,  EV* ev);
     
     void allocateDrones();
+
+    bool chargeCanComplete(EV* ev);
 
     //std::set < urgency, decltype(urgencyCmp)* > calcUrgency();
 

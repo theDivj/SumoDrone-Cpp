@@ -58,9 +58,9 @@ public:
         return droneIDCount;
     }
 
-    static void setDroneType(std::string droneType);
+    static void setDroneType(bool useOneBattery, std::string droneType);
 
-    static int setDroneTypeFromPOI(bool zeroDrone);   // returns how many drones were created                                       
+    static int setDroneTypeFromPOI(bool useOneBattery, bool zeroDrone);   // returns how many drones were created                                       
 
     bool operator<(const Drone& other) const {
         return myID < other.myID; // need to substring for number comparison

@@ -78,7 +78,7 @@ Drone::Drone(TraCIPosition pos, string poi, DroneType* DT) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  static methods
 
-void Drone::setDroneType(std::string droneType="ehang184") {  // Support different drone definitions - initially to give us a drone that doesn't need charging"""
+void Drone::setDroneType(bool useOneBattery, std::string droneType="ehang184") {  // Support different drone definitions - initially to give us a drone that doesn't need charging"""
 
     d0Type->droneKMperh = GlobalFlags::getDroneSpeed(); // get speed override if any
 
@@ -91,6 +91,7 @@ void Drone::setDroneType(std::string droneType="ehang184") {  // Support differe
         d0Type->droneChargeViablep = 0.3;                    // minimum viable level %
         d0Type->WhEVChargeRatePerTimeStep = 25000 / 3600.;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
         d0Type->WhDroneRechargePerTimeStep = 75000 / 3600.;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
+        d0Type->useOneBattery = useOneBattery;               // if true use the charge battery to fly and charge
     }
     else {  // default "ehang184"
         d0Type->droneChargeWh = 30000.0;                      // capacity of battery used to charge ev's, based on Ehang 184 load capacity - 200Kg
@@ -100,11 +101,12 @@ void Drone::setDroneType(std::string droneType="ehang184") {  // Support differe
         d0Type->droneChargeViablep = 0.3;                    // minimum viable level %
         d0Type->WhEVChargeRatePerTimeStep = 25000 / 3600.;   // 25KW   rate of vehicle charge from drone(adjust for timeStep when simulation starts)
         d0Type->WhDroneRechargePerTimeStep = 75000 / 3600.;  // 75KW   rate of drone charge when parked(adjust for timeStep when simulation starts)
+        d0Type->useOneBattery = useOneBattery;               // if true use the charge battery to fly and charge
     }
 }
 
 //retrieve drone parameters from Sumo POI d0 - returns true if parameters set otherwise false
-int Drone::setDroneTypeFromPOI(bool zeroDrone) {
+int Drone::setDroneTypeFromPOI(bool useOneBattery, bool zeroDrone) {
     // first set the defaults from d0 if it exists
     vector<string> POIlist = POI::getIDList();
     if (POIlist.size() > 0)
@@ -143,6 +145,11 @@ int Drone::setDroneTypeFromPOI(bool zeroDrone) {
                 string dWhDroneRechargeRate = POI::getParameter(poi, "WhDroneRechargeRate");
                 if (dWhDroneRechargeRate.size() > 1) Drone::d0Type->WhDroneRechargePerTimeStep = stoi(dWhDroneRechargeRate)/3600.;
 
+                string duseOneBattery = POI::getParameter(poi, "useOneBattery");
+                if (duseOneBattery.size() > 0) Drone::d0Type->useOneBattery = true;
+                else
+                    Drone::d0Type->useOneBattery = useOneBattery;
+
                 POI::remove(poi);
                 if (not zeroDrone){
                     return 1;  // ie we've set the d0Type so can return
@@ -153,10 +160,11 @@ int Drone::setDroneTypeFromPOI(bool zeroDrone) {
     //  retrieve the list again because we should have removed d0
     int poiDroneCount = 0;
     POIlist = POI::getIDList(); 
-    if (zeroDrone and POIlist.size() > 0) {
+    if (zeroDrone and (POIlist.size() > 0)) {
         for (string poi : POIlist) {
             if (POI::getType(poi) == "drone") {   // weve removed the d0 drone
-                DroneType* DT = new DroneType;
+                DroneType* DT = new DroneType(*d0Type);
+                //*DT = *d0Type;
                 double dWidth = POI::getWidth(poi);
                 if (dWidth > 1.) DT->droneWidth = dWidth;
                 double dHeight = POI::getHeight(poi);
@@ -189,7 +197,10 @@ int Drone::setDroneTypeFromPOI(bool zeroDrone) {
 
                 string dWhDroneRechargeRate = POI::getParameter(poi, "WhDroneRechargeRate");
                 if (dWhDroneRechargeRate.size() > 1) DT->WhDroneRechargePerTimeStep = stoi(dWhDroneRechargeRate) / 3600.;
- 
+
+                string duseOneBattery = POI::getParameter(poi, "useOneBattery");
+                if (duseOneBattery.size() > 0) Drone::d0Type->useOneBattery = true;
+
                 // create the drone
                 try {
                     TraCIPosition pos = POI::getPosition(poi);
@@ -387,7 +398,8 @@ void Drone::notifyChase(bool chaseOK, int chaseSteps) { // from EV updating chas
 void Drone::notifyEVFinished(EVState evState) { // EV tells us that it is charged or has left simulation so free self up"""
     switch (evState) {
     case EVState::LEFTSIMULATION:
-        myBrokenEVCharges += 1;
+        if ( myState == DroneState::CHARGINGEV)
+            myBrokenEVCharges += 1;
         setMyParkPosition();
         if (myState == DroneState::CHARGINGDRONE or myState == DroneState::PARKED) {
             dummyEVHide();
@@ -571,10 +583,17 @@ pair<bool,double> Drone::update(libsumo::TraCIPosition pos) { // primary update 
 bool Drone::usePower(std::string mode) {  // Am flying or charging an EV so adjust my charge levels"""
     bool breakOff = false;
     if (mode == "fly") {
-        myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
         myFlyingCount += 1;
-        if (myFlyingCharge < myDt->minDroneFlyingWh)
-            breakOff = true;
+        if (myDt->useOneBattery) {
+            myCharge -= myDt->droneFlyingWhperTimeStep;
+            if (myCharge < myDt->minDroneCharge)
+                breakOff = true;
+        }
+        else {
+            myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
+            if (myFlyingCharge < myDt->minDroneFlyingWh)
+                breakOff = true;
+        }
     }
     else if (mode == "chargeEV") {
         myCharge -= myDt->WhEVChargeRatePerTimeStep;
@@ -593,7 +612,10 @@ bool Drone::usePower(std::string mode) {  // Am flying or charging an EV so adju
     else {
         if (myState == DroneState::FLYINGTOCHARGE) {  // we're flying back to charge, only time we get here for now
             myFlyingCount += 1;
-            myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
+            if (myDt->useOneBattery)
+                myCharge -= myDt->droneFlyingWhperTimeStep;
+            else    
+                myFlyingCharge -= myDt->droneFlyingWhperTimeStep;
         }
     }
 

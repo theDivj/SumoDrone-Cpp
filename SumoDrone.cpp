@@ -53,6 +53,10 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
         .help("maximum EVs that are allowed to charge by Drone, default is no limit")
         .default_value(numeric_limits<int>::max()).scan<'i', int>();
 
+    program.add_argument("-f", "--fullChargeTolerance")
+        .help("tolerance (s) to ensure only full charges, default is allow broken charges")
+        .default_value(0).scan<'i', int>();
+
     program.add_argument("-k", "--droneKmPerHr")
         .help("drone speed Km/h default = 60.0")
         .default_value(60.0).scan<'g', double>();
@@ -82,6 +86,9 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     program.add_argument("-t", "--droneType")
         .help("type of drone - currently ehang184 (default) or ehang184x")
         .default_value("ehang184");
+
+    program.add_argument("-u", "--useOneBattery")
+        .help("use the charge battery for flying").flag();
 
     program.add_argument("--we", "--wEnergy")
         .help("weighting to apply to vehicles found in radius, default 1")
@@ -115,10 +122,14 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     if (program["zeroDrone"] == true)
         zeroDrone = true;
 
+    bool useOneBattery = false;
+    if (program["useOneBattery"] == true)
+        useOneBattery = true;
 
     auto chargeLog = program.get<string>("--chargeFile");
     auto droneLog = program.get<string>("--droneLog");
     briefStatistics = program.get<bool>("--brief");
+    auto fullChargeTolerance = program.get<int>("--fullChargeTolerance");
     int maxEVs = program.get<int>("--maxEVs");
     auto droneType = program.get<std::string>("--droneType");
     auto randomSeed = program.get<int>("--randomSeed");
@@ -136,14 +147,16 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     // create our management objects 
     dSimulation* ss = new dSimulation(sumoCmd, maxEVs);
     ChargeHubs* ch = new ChargeHubs();
-    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones);
+    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones, fullChargeTolerance);
 
     // setup globals
     gg = new GlobalFlags(ss, ch, cc);
     gg->setGlobals(droneKmPerHr, randomSeed, droneLog, chargeLog, onlyChargeOnce, modelRendezvous);
 
-    Drone::setDroneType(droneType);                         // set type as passed in runstring
-    int poiDrones = Drone::setDroneTypeFromPOI(zeroDrone);  // set type(s) as set in POI definitions
+    Drone::setDroneType(useOneBattery, droneType);          // set type as passed in runstring
+    int poiDrones = 0;
+    if (droneType != "ehang184x")                          // if using ehang184x don't override from add file
+        poiDrones = Drone::setDroneTypeFromPOI(useOneBattery, zeroDrone);  // set type(s) as set in POI definitions
     if (zeroDrone) {
         if (poiDrones > 0)
             cc->setMaxDrones(poiDrones);

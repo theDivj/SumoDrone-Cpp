@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>E:/SUMODrone/tests/grid2/grid2.sumocfg -m -d 12 -b -s sumo.exe --we 1 --wu 0 -t ehang184x</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>E:/SUMODrone/tests/grid2/grid2.sumocfg -m -d 12 -b -s sumo.exe --we 1 --wu 0 --z</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

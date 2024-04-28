@@ -14,6 +14,7 @@
 #include "EV.h"
 #include "ops.h"
 #include <utility>
+#include <limits>
 
 using namespace libsumo;
 using namespace std;
@@ -22,13 +23,17 @@ auto uCompare = [](urgency a, urgency b) {
     return (a.u < b.u);
     };*/
 
-ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones) {
+ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones, int pfullChargeTolerance) {
     wEnergy = pwEnergy;
     wUrgency = pwUrgency;
     proximityRadius = pproximityRadius;
     maxDrones = pmaxDrones;
     spawnedDrones = 0;
     insertedDummies = 0;
+    if (pfullChargeTolerance > 0)
+        fullChargeTolerance = pfullChargeTolerance;
+    else
+        fullChargeTolerance = 0;
 }
 
 void ControlCentre::allocate(Drone* drone,  EV* ev) {
@@ -52,10 +57,14 @@ void ControlCentre::allocateDrones() {
     int nd = ControlCentre::maxDrones - ControlCentre::spawnedDrones; // available new drones
     if (ld == 1)
         for (const auto& pr : urgencyList) {
-            auto droneIt = freeDrones.begin();
-            allocate(*droneIt, pr->ev);
-            freeDrones.erase(*droneIt);
-            break;
+            if (chargeCanComplete(pr->ev)) {
+                auto droneIt = freeDrones.begin();
+                allocate(*droneIt, pr->ev);
+                freeDrones.erase(*droneIt);
+                break;
+            }
+            else
+                requests.erase(pr->ev);  // will never be able to charge in time so remove request
         }
     else if (ld < 1 && nd > 0)
         for (const auto& pr : urgencyList) {
@@ -68,36 +77,38 @@ void ControlCentre::allocateDrones() {
         }
     else if (ld > 1)
         for (const auto& pr : urgencyList) { // need to find drone nearest the ev before we allocate
-            TraCIPosition evPos = pr->ev->getMyPosition();
-            double evDistance = numeric_limits<int>::max();
-            Drone* nearestDrone = nullptr;
-            for (auto& drone : freeDrones) {
-                TraCIPosition dronePos = drone->getMyPosition();
-                double distance = hypot(evPos.x - dronePos.x, evPos.y - dronePos.y);
-                if (nearestDrone == nullptr) {
-                    nearestDrone = drone;
-                    evDistance = distance;
+            if (chargeCanComplete(pr->ev)) {
+                TraCIPosition evPos = pr->ev->getMyPosition();
+                double evDistance = numeric_limits<int>::max();
+                Drone* nearestDrone = nullptr;
+                string droneID = "";
+                for (auto& drone : freeDrones) {
+                    TraCIPosition dronePos = drone->getMyPosition();
+                    double distance = hypot(evPos.x - dronePos.x, evPos.y - dronePos.y);
+                    if (distance < evDistance || (distance == evDistance && drone->getID() > droneID) ) {  // if distances same keep consistent drone assignment
+                        nearestDrone = drone;
+                        evDistance = distance;
+                        droneID = drone->getID();
+                    }
                 }
-                else if (distance < evDistance) {
-                    nearestDrone = drone;
-                    evDistance = distance;
+                if (nearestDrone) {
+                    allocate(nearestDrone, pr->ev);
+                    freeDrones.erase(nearestDrone);
                 }
+                else if (nd > 0)   // no free drones so spawn another
+                    for (const auto& pr : urgencyList) {
+                        TraCIPosition evPos = pr->ev->getMyPosition();
+                        pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
+                        Drone* drone = new Drone(hub.first.xypos);
+                        ControlCentre::spawnedDrones += 1;
+                        allocate(drone, pr->ev);
+                        nd -= 1;
+                        if (nd <= 0)
+                            break;
+                    }
             }
-            if (nearestDrone) {
-                allocate(nearestDrone, pr->ev);
-                freeDrones.erase(nearestDrone);
-            }
-            else if (nd > 0)   // no free drones so spawn another
-                for (const auto& pr : urgencyList) {
-                    TraCIPosition evPos = pr->ev->getMyPosition();
-                    pair<hubLocation, double> hub = GlobalFlags::ch->nearestHubLocation(evPos);
-                    Drone* drone = new Drone(hub.first.xypos);
-                    ControlCentre::spawnedDrones += 1;
-                    allocate(drone, pr->ev);
-                    nd -= 1;
-                    if (nd <= 0)
-                        break;
-                }
+            else
+                requests.erase(pr->ev);  // will never be able to charge in time so remove request
         }
     else  //   # ld == 0 nd > 0
         for (const auto& pr : urgencyList) {
@@ -115,6 +126,23 @@ void ControlCentre::allocateDrones() {
     
  }
 
+/* estimate whether the requested charge can complete before the EV leaves the simulation */
+bool ControlCentre::chargeCanComplete(EV* ev) {
+    if (this->fullChargeTolerance <= 0)   // ie we don't care whether charge can complete
+        return true;
+
+    string evID = ev->getID();
+    vector <string> evRoute = Vehicle::getRoute(evID);
+    string lastEdge = evRoute[evRoute.size()-1];
+    double dDist = Vehicle::getDrivingDistance(evID, lastEdge, 0.0);
+    double evSpeed = 0.9 * Vehicle::getAllowedSpeed(evID);
+    double availableChargeTime = (dDist / evSpeed) - this->fullChargeTolerance;
+
+    double requestedWh = requests[ev];
+    double possibleCharge = Drone::d0Type->WhEVChargeRatePerTimeStep * availableChargeTime;
+
+    return (possibleCharge > requestedWh);
+}
 
 
 /* work out the edge and position of the EV, when it is deltaPos metres along the route from the current position
@@ -396,14 +424,19 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         else
             flags += "False\tDrone print: ";
         if (GlobalFlags::myDronePrint)
+            flags += "True\tOne Battery: ";
+        else
+            flags += "False\tOne Battery: ";
+        if (Drone::d0Type->useOneBattery)
             flags += "True\n";
         else
             flags += "False\n";
 
+
         cout << std::fixed << std::setprecision(1);
         cout << "\nSummary Statistics:\t\t" << timeStamp << flags;
-        cout << "\tEnergy Weight: " << wEnergy << "\tUrgency Weight: " << wUrgency;
-        cout << "\tProximity radius(m): " << proximityRadius << "\tTime steps : " << GlobalFlags::ss->getTimeStep() << endl;
+        cout << "\tEnergy Wt: " << wEnergy << "\tUrgency Wt: " << wUrgency;
+        cout << "\t\tProximity radius(m): " << proximityRadius << "\tSteps : " << GlobalFlags::ss->getTimeStep() << "\tTolerance(s): " << fullChargeTolerance << endl;
         cout << "\n\tDrone Totals: (" << spawnedDrones << ")" << endl;
         cout <<  std::setprecision(2);
         cout << "\t\tDistance Km: \t" << tDroneDistance << "\n\t\tFlying KWh: \t" << tmyFlyingKWh << "\n\t\tCharging KWh: \t" << tmyChargingKWh << endl;
@@ -418,13 +451,13 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
             cout << "\n\tSuccessful chases: " << tmyChaseCount << "\tAverage chase time: " << averageChase << "s\tbroken Chases: " << tmyBrokenChaseCount << endl;
 
         cout << "\nDiscrete Drone data:" << endl;
-        cout << std::setprecision(2);
         for (auto drone : allDrones) {
+            cout << std::setprecision(2);
             double droneDistance = drone->myFlyingCount * drone->myDt->droneStepMperTimeStep / 1000.;
             double droneFlyingKWh = drone->myFlyingCount * drone->myDt->droneFlyingWhperTimeStep / 1000.;
             double droneChargeKWh = drone->myEVChargingCount * drone->myDt->WhEVChargeRatePerTimeStep / 1000.;
             cout << "\tdrone: " << drone->getID() << "\tKm: " << droneDistance << "\tCharge KW: " << droneChargeKWh;
-            cout << "\tFlyingKW: " << droneFlyingKWh << "\tResidual (chargeWh: " << drone->myCharge << "\tflyingWh: " << drone->myFlyingCharge << ")" << endl;
+            cout << "\tFlyingKW: " << droneFlyingKWh << std::setprecision(0) << "\tResidual (chargeWh: " << drone->myCharge << "\tflyingWh: " << drone->myFlyingCharge << ")" << endl;
         }
     }
 }

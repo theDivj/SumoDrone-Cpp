@@ -17,6 +17,7 @@ public:
     libsumo::TraCIColor droneColour;
     double droneWidth;
     double droneHeight;
+    bool useOneBattery;             // whether to use charge battery for flying and charging
 
     // derived variables
     double droneMperSec;

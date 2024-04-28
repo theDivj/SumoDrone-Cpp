@@ -16,6 +16,7 @@ DroneType::DroneType() {
     droneColour = { 0, 0, 255, 255 };
     droneWidth = 10.0;
     droneHeight = 10.0;
+    useOneBattery = false;
 
     // derived variables
     droneMperSec = droneKMperh / 3.6;
@@ -66,5 +67,6 @@ std::ostream& operator<<(std::ostream& os, DroneType const& dt) {
     os << "minDroneFlyingWh\t" << dt.minDroneFlyingWh << "\n";
     os << "viableDroneCharge\t" << dt.viableDroneCharge << "\n";       // thresholds to allow allocation - ie enough charge to be useful
     os << "viableDroneFlyingWh\t" << dt.viableDroneFlyingWh << "\n";
+    os << "useOneBattery\t" << dt.useOneBattery << "\n";
     return os;
 }
