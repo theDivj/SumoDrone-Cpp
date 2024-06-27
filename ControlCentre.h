@@ -35,13 +35,14 @@ private:
     static inline std::unordered_set<Drone*> needChargeDrones;
     static inline int spawnedDrones;
     static inline int fullChargeTolerance;
+    static inline double globalCharge;
 
 public:
     int insertedDummies;
 
     static inline std::unordered_set<Drone*> freeDrones;
 
-    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones, int fullChargeTolerance);
+    ControlCentre(double wEnergy, double wUrgency, double proximityRadius, int maxDrones, int fullChargeTolerance, double globalCharge);
 
     ControlCentre() = default;
 

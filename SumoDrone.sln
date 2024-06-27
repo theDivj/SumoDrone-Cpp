@@ -5,7 +5,7 @@ VisualStudioVersion = 17.9.34622.214
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SumoDrone", "SumoDrone.vcxproj", "{6D7FB86F-D210-498E-83E6-C4E5F21C34EF}"
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "SumoDrone-v3.3", "SumoDrone-v3.3\SumoDrone-v3.3.vdproj", "{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}"
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "SumoDrone-install", "SumoDrone-v3.3\SumoDrone-v3.3.vdproj", "{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +26,7 @@ Global
 		{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}.Debug|x64.ActiveCfg = Debug
 		{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}.Debug|x86.ActiveCfg = Debug
 		{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}.Release|x64.ActiveCfg = Release
+		{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}.Release|x64.Build.0 = Release
 		{A208B34A-AA53-42B2-9EE8-ACF56C9C43A3}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution

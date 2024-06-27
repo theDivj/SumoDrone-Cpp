@@ -33,7 +33,7 @@ SumoDrone::~SumoDrone() {
 
 GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
 
-    argparse::ArgumentParser program(argv[0], "v3.3");
+    argparse::ArgumentParser program(argv[0], __version__);
     // set up the expected runstring
     program.add_argument("sumocfg")               // mandatory
         .help("sumo configuration file");
@@ -56,6 +56,10 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     program.add_argument("-f", "--fullChargeTolerance")
         .help("tolerance (s) to ensure only full charges, default is allow broken charges")
         .default_value(0).scan<'i', int>();
+
+    program.add_argument("-g", "--globalCharge")
+        .help("global override of all charge request values")
+        .default_value(0.0).scan<'g', double>();
 
     program.add_argument("-k", "--droneKmPerHr")
         .help("drone speed Km/h default = 60.0")
@@ -130,6 +134,7 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     auto droneLog = program.get<string>("--droneLog");
     briefStatistics = program.get<bool>("--brief");
     auto fullChargeTolerance = program.get<int>("--fullChargeTolerance");
+    auto globalCharge = program.get<double>("--globalCharge");
     int maxEVs = program.get<int>("--maxEVs");
     auto droneType = program.get<std::string>("--droneType");
     auto randomSeed = program.get<int>("--randomSeed");
@@ -147,7 +152,7 @@ GlobalFlags* SumoDrone::parseRunstring(int argc, char* argv[]) {
     // create our management objects 
     dSimulation* ss = new dSimulation(sumoCmd, maxEVs);
     ChargeHubs* ch = new ChargeHubs();
-    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones, fullChargeTolerance);
+    ControlCentre* cc = new ControlCentre(wEnergy, wUrgency, proximityRadius, maxDrones, fullChargeTolerance, globalCharge);
 
     // setup globals
     gg = new GlobalFlags(ss, ch, cc);

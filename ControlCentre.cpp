@@ -23,10 +23,11 @@ auto uCompare = [](urgency a, urgency b) {
     return (a.u < b.u);
     };*/
 
-ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones, int pfullChargeTolerance) {
+ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximityRadius, int pmaxDrones, int pfullChargeTolerance, double pglobalCharge) {
     wEnergy = pwEnergy;
     wUrgency = pwUrgency;
     proximityRadius = pproximityRadius;
+    globalCharge = pglobalCharge;
     maxDrones = pmaxDrones;
     spawnedDrones = 0;
     insertedDummies = 0;
@@ -463,9 +464,12 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
 }
 
 void ControlCentre::requestCharge(EV* ev, double capacity, double requestedWh = 2000.0) {
-    requests[ev] = requestedWh;
+    if (globalCharge > 1.0)
+        requests[ev] = globalCharge;
+    else
+        requests[ev] = requestedWh;
     if (GlobalFlags::myChargePrint)
-        GlobalFlags::myChargeLog << GlobalFlags::ss->getTimeStep() << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requestedWh << endl;
+        GlobalFlags::myChargeLog << GlobalFlags::ss->getTimeStep() << "\t" <<  ev->getID() << "\t" << "CHARGEREQUESTED" << "\t" << "" << "\t" << capacity << "\t" << 0.0 << "\t" << requests[ev] << endl;
  }
 
 void ControlCentre::tidyDrones() {
