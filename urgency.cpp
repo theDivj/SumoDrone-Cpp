@@ -25,8 +25,8 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
     std::set <urgency*, decltype(urgencyCmp)* > urgencyList(urgencyCmp);
     std::set <tuple<double,double,EV*,double>*> urgencySet;
 
-    double urgencySum = 0.0;
-    double proximitySum = 0.0;
+    double urgencyMax = 0.0;
+    double proximityMax = 0.0;
 
     if (ControlCentre::requests.size() == 1)
         for (auto ev : ControlCentre::requests)
@@ -55,9 +55,13 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
                 }
                 else   // otherwise just a guesstimate
                     evRange = stod(Vehicle::getParameter(evID, "device.battery.actualBatteryCapacity")) * ev.first->getMyKmPerWh();
+                if (evRange <= 0.0)    //  zero means battery flat!
+                    evRange = 1.0;
 
-                urgencyv = hDist.second / evRange;
-                urgencySum += urgencyv;
+                urgencyv = hDist.second / evRange;  // we want most urgent to have lowest value - to be compatible with proximity(lowest proximity = nearest.
+
+                if (urgencyv > urgencyMax)
+                    urgencyMax = urgencyv;
             }
 
             double proximityv = 0.0;
@@ -86,7 +90,8 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
                     proximityv = droneDist + neighbours.second;     //  + evRange
                 else
                     proximityv = droneDist + neighbours.second;     //   /drivingDistance
-                proximitySum += proximityv;
+                if (proximityv > proximityMax)
+                    proximityMax = proximityv;
             }
             urgencySet.insert(new tuple(urgencyv, proximityv, ev.first, ev.second));          
         }
@@ -95,10 +100,10 @@ std::set<urgency*, decltype(urgencyCmp)* > urgency::calcUrgency() {
         size_t evCount = urgencySet.size();
         double urgencyWt = 0.0;
         if (ControlCentre::wUrgency > 0.0)
-            urgencyWt= ControlCentre::wUrgency / (urgencySum / evCount);
+            urgencyWt= ControlCentre::wUrgency / urgencyMax;
         double proximityWt = 0.0;
         if (ControlCentre::wEnergy > 0.0)
-            proximityWt= ControlCentre::wEnergy / (proximitySum / evCount);
+            proximityWt= ControlCentre::wEnergy / proximityMax;
 
         for (const auto pr : urgencySet) {
             double urgencyv = std::get<0>(*pr) * urgencyWt;

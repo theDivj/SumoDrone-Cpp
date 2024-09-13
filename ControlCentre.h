@@ -12,13 +12,13 @@
 
 #include "GlobalFlags.h"
 #include "EVState.h"
-#include "urgency.h"
+#include "EvAllocationFactors.h"
 
 class Drone;
 
 class ControlCentre
 {
-    friend class urgency;
+    friend class EvAllocationFactors;
 
 protected:
     static inline double wEnergy;
@@ -39,6 +39,8 @@ private:
 
 public:
     int insertedDummies;
+    int misMatch;
+    int allocationCount;
 
     static inline std::unordered_set<Drone*> freeDrones;
 
@@ -52,13 +54,9 @@ public:
 
     bool chargeCanComplete(EV* ev);
 
-    //std::set < urgency, decltype(urgencyCmp)* > calcUrgency();
-
     std::tuple<std::string, double, bool> findEdgePos(std::string evID, double deltaPos);
 
     libsumo::TraCIPosition findRendezvousXY( EV* ev, Drone* drone);
-
-    //std::pair<std::unordered_set< EV*>, double> getNeighboursNeedingCharge( EV* ev, bool firstCall);
 
     void notifyDroneState(Drone* drone);
 
@@ -81,5 +79,3 @@ public:
 
     void update();
 };
-//std::pair<std::unordered_set< EV*>, double> getNeighboursNeedingCharge( EV* ev, bool firstCall);
-

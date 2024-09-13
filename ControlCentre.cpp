@@ -35,11 +35,14 @@ ControlCentre::ControlCentre(double pwEnergy, double pwUrgency, double pproximit
         fullChargeTolerance = pfullChargeTolerance;
     else
         fullChargeTolerance = 0;
+    misMatch = 0;          // used to accumulate the urgency position at each allocation
+    allocationCount = 0;   // count of allocations used to normalise misMatch value
 }
 
 void ControlCentre::allocate(Drone* drone,  EV* ev) {
     allocatedEV[ev] = drone;
     allocatedDrone[drone] = ev;
+    allocationCount++;
     if (GlobalFlags::myModelRendezvous)
         ev->allocate(drone, findRendezvousXY(ev, drone));
     else {
@@ -52,7 +55,7 @@ void ControlCentre::allocate(Drone* drone,  EV* ev) {
 
 
 void ControlCentre::allocateDrones() {
-    std::set<urgency*, decltype(urgencyCmp)* > urgencyList = urgency::calcUrgency();
+    std::set<EvAllocationFactors*, decltype(EvAllocationFactorsCmp)* > urgencyList = EvAllocationFactors::calcEvAllocationFactors();
 
     size_t ld = freeDrones.size();                                    // available loaded drones
     int nd = ControlCentre::maxDrones - ControlCentre::spawnedDrones; // available new drones
@@ -61,6 +64,7 @@ void ControlCentre::allocateDrones() {
             if (chargeCanComplete(pr->ev)) {
                 auto droneIt = freeDrones.begin();
                 allocate(*droneIt, pr->ev);
+                misMatch += pr->getPosition();
                 freeDrones.erase(*droneIt);
                 break;
             }
@@ -73,6 +77,7 @@ void ControlCentre::allocateDrones() {
             Drone* drone = new Drone(hub.first.xypos);
             spawnedDrones += 1;
             allocate(drone, pr->ev);
+            misMatch += pr->getPosition();
             if ((nd -= 1) <= 0)
                 break;
         }
@@ -94,6 +99,7 @@ void ControlCentre::allocateDrones() {
                 }
                 if (nearestDrone) {
                     allocate(nearestDrone, pr->ev);
+                    misMatch += pr->getPosition();
                     freeDrones.erase(nearestDrone);
                 }
                 else if (nd > 0)   // no free drones so spawn another
@@ -103,6 +109,7 @@ void ControlCentre::allocateDrones() {
                         Drone* drone = new Drone(hub.first.xypos);
                         ControlCentre::spawnedDrones += 1;
                         allocate(drone, pr->ev);
+                        misMatch += pr->getPosition();
                         nd -= 1;
                         if (nd <= 0)
                             break;
@@ -118,6 +125,7 @@ void ControlCentre::allocateDrones() {
             Drone* drone = new Drone(hub.first.xypos);
             ControlCentre::spawnedDrones += 1;
             allocate(drone, pr->ev);
+            misMatch += pr->getPosition();
             nd -= 1;
             if (nd <= 0)
                 break;
@@ -320,6 +328,8 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
     int tmyBrokenChaseCount = 0;      // no of broken chases(vehicle left after rendezvous but before drone got there)
     int tmyChaseSteps = 0;            // steps for succesful chases - used to compute average chase time
 
+    double cMisMatch = double(misMatch) / allocationCount;
+
     set<Drone*, decltype(droneCmp)*> allDrones(droneCmp);
     merge(freeDrones.begin(), freeDrones.end(), needChargeDrones.begin(), needChargeDrones.end(),
         inserter(allDrones, allDrones.begin()));
@@ -386,7 +396,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
 
         cout << "Date\tRv\tOnce\tOutput\twE\twU\tradius\tSteps\tDrones"
             << "\tDistance\tFlyKWh\tchKWh\tFlyChgKWh\tChgKWh\trFlyKWh\trChKWh"
-            << "\tEVs\tEVChg\tEVgap\tFull\tbrDrone\tbrEV\tChases\tAvg Chase\tBrk Chase" << endl;
+            << "\tEVs\tEVChg\tEVgap\tFull\tbrDrone\tbrEV\tChases\tAvg Chase\tBrk Chase\tmisMatch" << endl;
 
         string flags = timeStamp;
         if (GlobalFlags::myModelRendezvous)
@@ -409,9 +419,9 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
             << EV::evCount << "\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
             << tmyFullCharges << "\t" << tmyBrokenCharges << "\t" << tmyBrokenEVCharges << "\t";
         if (GlobalFlags::myModelRendezvous)
-            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << runstring  << "\t" << version << "\t" << sumoVersion << endl;
+            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << cMisMatch << "\t" << runstring  << "\t" << version << "\t" << sumoVersion << endl;
         else
-            cout << "\t\t\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
+            cout << "\t\t\t" << cMisMatch << "\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
 
     }
     else {
@@ -446,10 +456,10 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         cout << std::setprecision(1);
         cout << "\n\tEV Totals: (" << EV::evCount << ")\n\t\tCharge KWh:\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << endl;
         cout << "\t\tCharge Gap KWh: " << EV::evChargeGap / (1000. * EV::evCount) << endl;
-        cout << "\t\tCharge Sessions:\n\t\t\tFull charges:\t" << tmyFullCharges << "\n\t\t\tPart (drone):\t" << tmyBrokenCharges << "\n\t\t\tPart (ev) :\t" << tmyBrokenEVCharges << endl;
+        cout << "\t\tCharge Sessions:\n\t\t\tFull charges:\t" << tmyFullCharges << "\n\t\t\tPart (drone):\t" << tmyBrokenCharges << "\n\t\t\tPart (ev) :\t" << tmyBrokenEVCharges << "\n\t\tmisMatch: " << cMisMatch << endl;
 
         if (GlobalFlags::myModelRendezvous)
-            cout << "\n\tSuccessful chases: " << tmyChaseCount << "\tAverage chase time: " << averageChase << "s\tbroken Chases: " << tmyBrokenChaseCount << endl;
+            cout << "\n\tSuccessful chases: " << tmyChaseCount << "\tAverage chase time: " << averageChase << "s\tbroken Chases: " << tmyBrokenChaseCount  << endl;
 
         cout << "\nDiscrete Drone data:" << endl;
         for (auto drone : allDrones) {
@@ -495,8 +505,9 @@ void ControlCentre::update() { //Management of 'control centre' executed by simu
     for (Drone* drone : freeDrones) {
         drone->parkingUpdate();
        }
-    for (Drone* drone : needChargeDrones) {
-        drone->parkingUpdate();
+    for (Drone* drone : needChargeDrones) {   // there is a corner case where drone ends up in both
+        if (freeDrones.find(drone) == freeDrones.end())  
+            drone->parkingUpdate();
     }
 }
 

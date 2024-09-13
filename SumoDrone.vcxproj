@@ -148,11 +148,11 @@
     <ClCompile Include="DroneType.cpp" />
     <ClCompile Include="dSimulation.cpp" />
     <ClCompile Include="EV.cpp" />
+    <ClCompile Include="EvAllocationFactors.cpp" />
     <ClCompile Include="EVState.h" />
     <ClCompile Include="GlobalFlags.cpp" />
     <ClCompile Include="ops.cpp" />
     <ClCompile Include="SumoDrone.cpp" />
-    <ClCompile Include="urgency.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="argparse.h" />
@@ -163,10 +163,10 @@
     <ClInclude Include="DroneType.h" />
     <ClInclude Include="dSimulation.h" />
     <ClInclude Include="EV.h" />
+    <ClInclude Include="EvAllocationFactors.h" />
     <ClInclude Include="GlobalFlags.h" />
     <ClInclude Include="ops.h" />
     <ClInclude Include="SumoDrone.h" />
-    <ClInclude Include="urgency.h" />
     <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
