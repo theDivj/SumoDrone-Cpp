@@ -314,7 +314,9 @@ bool droneCmp(const Drone* lurg, const Drone* rurg)
 
 void ControlCentre::printDroneStatistics(bool brief, string version, string runstring) {   //Print out Drone and EV statistics for the complete run"""
     // compute drone statistic totals
+    double tmyLifetime = 0;           // Time drones are available
     int tmyFlyingCount = 0;           // used to compute distance travelled
+    int tmyOverheadCount = 0;         // count of overhead steps (ie charging or flying to charge)
     int tmyFullCharges = 0;           // count of complete charges
     int tmyBrokenCharges = 0;         // count of charges broken off - either by me out of charge
     int tmyBrokenEVCharges = 0;       // count of charges broken off - by EV leaving
@@ -340,8 +342,11 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
     double tmyChargeMeFlyingKWh = 0.0;
     double tmyChargeMeKWh = 0.0;
 
+    double totalSteps = GlobalFlags::ss->getTimeStep();
     for (auto drone : allDrones) {
+        tmyLifetime += totalSteps - drone->myCreationTime;
         tmyFlyingCount += drone->myFlyingCount;
+        tmyOverheadCount += drone->myOverheadCount;
         tmyFlyingKWh += (drone->myFlyingCount * drone->myDt->droneFlyingWhperTimeStep);
 
         tDroneDistance += (drone->myFlyingCount * drone->myDt->droneStepMperTimeStep);
@@ -373,6 +378,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
     tmyChargeMeKWh /= 1000.;
     tmyResidualFlyingKWh /= 1000;
     tmyResidualChargeKWh /= 1000.;
+    double pOverhead = 100.0 * tmyOverheadCount / tmyLifetime;
 
     double averageChase = 0;
     if (GlobalFlags::myModelRendezvous) {
@@ -394,9 +400,9 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
     if (brief) {
         string sumoVersion = "(" +  libsumoVersion.first  + std::string(", ") + libsumoVersion.second + ")";
 
-        cout << "Date\tRv\tOnce\tOutput\twE\twU\tradius\tSteps\tDrones"
+        cout << "Date\tRv\tOnce\tOutput\twE\twU\tradius\tSteps\t# Drones"
             << "\tDistance\tFlyKWh\tchKWh\tFlyChgKWh\tChgKWh\trFlyKWh\trChKWh"
-            << "\tEVs\tEVChg\tEVgap\tFull\tbrDrone\tbrEV\tChases\tAvg Chase\tBrk Chase\tmisMatch" << endl;
+            << "\t# EVs\tEVChg\tEVgap\tFull\tbrDrone\tbrEV\tChases\tAvg Chase\tBrk Chase\tmisMatch\t%Overhead" << endl;
 
         string flags = timeStamp;
         if (GlobalFlags::myModelRendezvous)
@@ -419,9 +425,9 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
             << EV::evCount << "\t" << EV::evChargeSteps * Drone::d0Type->WhEVChargeRatePerTimeStep / 1000. << "\t" << EV::evChargeGap / (1000. * EV::evCount) << "\t"
             << tmyFullCharges << "\t" << tmyBrokenCharges << "\t" << tmyBrokenEVCharges << "\t";
         if (GlobalFlags::myModelRendezvous)
-            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << cMisMatch << "\t" << runstring  << "\t" << version << "\t" << sumoVersion << endl;
+            cout << tmyChaseCount << "\t" << averageChase << "\t" << tmyBrokenChaseCount << "\t" << cMisMatch << "\t" << pOverhead << "\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
         else
-            cout << "\t\t\t" << cMisMatch << "\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
+            cout << "\t\t\t" << cMisMatch << "\t" << pOverhead << "\t" << runstring << "\t" << version << "\t" << sumoVersion << endl;
 
     }
     else {
@@ -450,7 +456,7 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
         cout << "\t\tProximity radius(m): " << proximityRadius << "\tSteps : " << GlobalFlags::ss->getTimeStep() << "\tTolerance(s): " << fullChargeTolerance << endl;
         cout << "\n\tDrone Totals: (" << spawnedDrones << ")" << endl;
         cout <<  std::setprecision(2);
-        cout << "\t\tDistance Km: \t" << tDroneDistance << "\n\t\tFlying KWh: \t" << tmyFlyingKWh << "\n\t\tCharging KWh: \t" << tmyChargingKWh << endl;
+        cout << "\t\tDistance Km: \t" << tDroneDistance << "\n\t\tFlying KWh: \t" << tmyFlyingKWh << "\n\t\tCharging KWh: \t" << tmyChargingKWh <<"\n\t\tOverhead: \t" << pOverhead << "%" << endl;
         cout << "\tDrone Charger usage:\n\t\tFlying KWh:\t" << tmyChargeMeFlyingKWh << "\n\t\tCharge KWh: \t" << tmyChargeMeKWh << endl;
         cout << "\tResiduals:\n\t\tFlying KWh:\t" << tmyResidualFlyingKWh << "\n\t\tCharging KWh: \t" << tmyResidualChargeKWh << endl;
         cout << std::setprecision(1);
@@ -467,8 +473,9 @@ void ControlCentre::printDroneStatistics(bool brief, string version, string runs
             double droneDistance = drone->myFlyingCount * drone->myDt->droneStepMperTimeStep / 1000.;
             double droneFlyingKWh = drone->myFlyingCount * drone->myDt->droneFlyingWhperTimeStep / 1000.;
             double droneChargeKWh = drone->myEVChargingCount * drone->myDt->WhEVChargeRatePerTimeStep / 1000.;
+            double pOverhead = 100.0 * drone->myOverheadCount / ( totalSteps - drone->myCreationTime);
             cout << "\tdrone: " << drone->getID() << "\tKm: " << droneDistance << "\tCharge KW: " << droneChargeKWh;
-            cout << "\tFlyingKW: " << droneFlyingKWh << std::setprecision(0) << "\tResidual (chargeWh: " << drone->myCharge << "\tflyingWh: " << drone->myFlyingCharge << ")" << endl;
+            cout << "\tFlyingKW: " << droneFlyingKWh << std::setprecision(0) << "\tResidual (chargeWh: " << drone->myCharge << "\tflyingWh: " << drone->myFlyingCharge << ")" << "\tOverhead: " << pOverhead << "%" << endl;
         }
     }
 }

@@ -37,7 +37,9 @@ public:
     double myFlyingCharge;
 
     // logging
+    double myCreationTime;          // time at which drone is launched
     int myFlyingCount;              // used to compute distance travelled
+    int myOverheadCount;            // time not available to charge (ie when flying to charge or actually charging)
     int myFullCharges;              // count of complete charges
     int myBrokenCharges;             // count of charges broken off - by me out of charge
     int myBrokenEVCharges;          // count of charges broken off - by EV(leaving)

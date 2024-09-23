@@ -45,7 +45,9 @@ Drone::Drone(TraCIPosition pos, string poi, DroneType* DT) {
     myEV = nullptr;
 
     // logging variables
+    myCreationTime = GlobalFlags::ss->getTimeStep();   // time at which drone is launched
     myFlyingCount = 0;            // used to compute distance travelled
+    myOverheadCount = 0;          // time not available to charge (ie when flying to charge or actually charging)
     myFullCharges = 0;             // count of complete charges
     myBrokenCharges = 0;           // count of charges broken off - by me out of charge
     myBrokenEVCharges = 0;         // count of charges broken off - by EV(leaving)
@@ -534,12 +536,14 @@ pair<bool,double> Drone::update(libsumo::TraCIPosition pos) { // primary update 
 
     case DroneState::CHARGINGDRONE:
         chargeMe();
+        myOverheadCount++;
         if (GlobalFlags::myDronePrint)
             logLine("charging self");
         break;
 
     case DroneState::FLYINGTOCHARGE:
         usePower("");
+        myOverheadCount++;
         if (fly(myParkPosition)) {
             POI::setParameter(myID, "status", "parked - needs charge");
             POI::setColor(myID, { 0, 255, 0, 255 });
